@@ -144,6 +144,11 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; list-st
 details summary::-webkit-details-marker { display: none; }
 details p { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
 
+/* Fußzeile */
+.foot { font-size: 11px; line-height: 1.6; color: var(--dim); text-align: center; margin: 18px 4px 0; }
+.foot b { color: var(--muted); font-weight: 600; }
+.foot a { color: var(--muted); }
+
 /* Einstellungen */
 dialog { border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text);
   width: min(520px, calc(100% - 24px)); max-height: 90vh; overflow-y: auto; padding: 20px; }
@@ -202,6 +207,13 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
       <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble, ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
     </details>
   </section>
+
+  <footer class="foot">
+    <div><b>© 2026 SchichtRADWETTER</b> · Alle Rechte vorbehalten</div>
+    <div>Wetterdaten: <a href="https://data.hub.geosphere.at" target="_blank" rel="noopener">GeoSphere Austria</a> (CC BY 4.0) ·
+      <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) mit Modelldaten von DWD und ECMWF</div>
+    <div>Angaben ohne Gewähr. Vor der Fahrt selbst auf Straße und Wetter achten.</div>
+  </footer>
 </main>
 
 <dialog id="settings">

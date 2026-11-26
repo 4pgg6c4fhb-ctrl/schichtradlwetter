@@ -36,3 +36,10 @@ Schneefahrbahn bringt; ⚠️ *aufpassen* ab 25 %, bei Glätte oder Sturmböen.
 
 Statische Dateien, kein Build, veröffentlicht über GitHub Pages (Branch `main`, Ordner `/`).
 Lokal: `python3 -m http.server` und `http://localhost:8000` öffnen.
+
+## Rechtliches
+
+© 2026 SchichtRADWETTER · Alle Rechte vorbehalten.
+
+Wetterdaten: GeoSphere Austria (CC BY 4.0), Open-Meteo.com (CC BY 4.0) mit Modelldaten
+von DWD und ECMWF. Angaben ohne Gewähr.
