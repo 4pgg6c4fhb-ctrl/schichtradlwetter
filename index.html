@@ -109,7 +109,7 @@ details p, details li { font-size: 13px; color: var(--muted); }
 .next.ok .verdict { color: var(--green); } .next.warn .verdict { color: var(--amber); } .next.stop .verdict { color: var(--red); }
 .next .why { color: var(--amber); font-weight: 600; margin-bottom: 8px; }
 .next.stop .why { color: var(--red); }
-.kv { display: flex; gap: 22px; margin-bottom: 10px; }
+.kv { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 10px; }
 .kv .val { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .next .clothes { font-size: 17px; font-weight: 600; line-height: 1.35; }
 .ride-info .w { color: var(--amber); }
@@ -155,6 +155,7 @@ dialog { max-height: 90vh; overflow-y: auto; }
       <summary>Wie wird gerechnet?</summary>
       <p><b>Gefühlt</b> = Temperatur am Rad mit Wind + Fahrtwind (Einstellungen).</p>
       <p><b>🚫 Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe <b>mehr Regen als deine Grenze</b> bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder <b>Schneefahrbahn</b> droht. <b>⚠️ Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
+      <p><b>Glätte</b> nur bei Feuchtigkeit: nasse Fahrbahn bei Frost (Regen jetzt oder in den 6 Stunden davor) oder Reif (Frost + Luftfeuchte ab 92 % bei klarem Himmel, Nebelreif ab 97 %). Trockene Kälte ist nicht glatt.</p>
       <p><b>Schnee:</b> Hinweg = Neuschnee der 6 Stunden davor, Heimweg = Neuschnee während der ganzen Schicht.</p>
       <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble und ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
     </details>

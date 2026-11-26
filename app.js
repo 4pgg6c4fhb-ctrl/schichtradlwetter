@@ -92,7 +92,9 @@ function planShifts(hours, data, s, p) {
       if (key <= now) return null;
       const h = byT.get(key);
       const snow = snowRisk(snowFrom, snowTo, data, p.snowCm);
-      return { name, from: key - HOUR, to: key, h, a: h ? assessRide([h], snow, p) : null };
+      const prev = [];
+      for (let t = key - 6 * HOUR; t < key; t += HOUR) if (byT.has(t)) prev.push(byT.get(t));
+      return { name, from: key - HOUR, to: key, h, a: h ? assessRide([h], snow, p, prev) : null };
     };
     items.push({
       d, sh, i, start, end,
@@ -140,6 +142,7 @@ function renderNext(items) {
       <div><div class="label">Luft</div><div class="val">${deg(r.h.temp)}</div></div>
       <div><div class="label">Regen</div><div class="val">${fmt0(r.h.prob)} %</div></div>
       <div><div class="label">Schnee</div><div class="val">${fmt0(a.pSnow)} %</div></div>
+      <div><div class="label">Feuchte</div><div class="val">${fmt0(r.h.rh)} %</div></div>
     </div>
     <div class="label">Anziehen</div>
     <div class="clothes">${esc(a.clothes)}</div>`;
@@ -164,7 +167,7 @@ function renderSummary(items, s) {
     const issues = (a) => [
       !stopped && a.pSnow >= 25 ? 'evtl. Schnee auf der Fahrbahn' : null,
       !stopped && a.pHeavy >= 25 ? 'evtl. stärkerer Regen' : null,
-      a.ice && a.pSnow < 25 ? 'Glättegefahr' : null,
+      a.ice ? (a.iceText.startsWith('Reif') ? 'Reifglätte' : 'Glätte durch Nässe') : null,
       a.storm ? 'Sturmböen' : null,
     ].filter(Boolean).join(' und ');
     const per = it.rides.filter((r) => r.a && issues(r.a)).map((r) => [r.name, issues(r.a)]);
@@ -188,7 +191,7 @@ function rideHtml(r) {
   const a = r.a;
   return `<div class="ride ${a.verdict}">
     <div class="ride-top"><span class="lbl">${lbl}</span><span class="v">${VERDICT[a.verdict][0]} ${VERDICT[a.verdict][1]}</span></div>
-    <div class="ride-info">gefühlt <b>${deg(r.h.feel)}</b> · Regen <b>${fmt0(r.h.prob)} %</b>${a.pSnow >= 5 ? ` · Schnee <b>${fmt0(a.pSnow)} %</b>` : ''}${a.reasons.length ? ` · <span class="w">${esc(a.reasons.join(', '))}</span>` : ''}</div>
+    <div class="ride-info">gefühlt <b>${deg(r.h.feel)}</b> · Regen <b>${fmt0(r.h.prob)} %</b> · Feuchte <b>${fmt0(r.h.rh)} %</b>${a.pSnow >= 5 ? ` · Schnee <b>${fmt0(a.pSnow)} %</b>` : ''}${a.reasons.length ? ` · <span class="w">${esc(a.reasons.join(', '))}</span>` : ''}</div>
     <div class="ride-cloth">${esc(a.clothes)}</div></div>`;
 }
 
@@ -281,7 +284,7 @@ $('btnReload').addEventListener('click', () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) run(); });
 
 // alte Zwischenspeicher (ohne Schneedaten) entfernen
-try { Object.keys(localStorage).filter((k) => k.startsWith('om-')).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
+try { Object.keys(localStorage).filter((k) => /^(om-|om2-|gs-nwp-)/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 run();
