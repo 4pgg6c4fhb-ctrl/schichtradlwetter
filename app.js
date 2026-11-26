@@ -175,6 +175,7 @@ const ICONS = {
   snow: '<path d="M2 12h20M12 2v20M5 5l14 14M19 5 5 19"/>',
   humid: '<path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05Z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>',
   shirt: '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23Z"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
 };
 const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -301,6 +302,23 @@ $('logo').innerHTML = icon('bike');
 $('btnReload').innerHTML = icon('refresh');
 $('btnSettings').innerHTML = icon('sliders');
 $('howSummary').insertAdjacentHTML('afterbegin', icon('info'));
+
+// Teilen: Handy → Teilen-Menü, sonst Link kopieren
+const APP_URL = 'https://4pgg6c4fhb-ctrl.github.io/schichtradlwetter/';
+const shareLabel = () => { $('btnShare').innerHTML = `${icon('share')}App teilen`; };
+shareLabel();
+$('btnShare').addEventListener('click', async () => {
+  const data = { title: 'SchichtRADWETTER', text: 'Radwetter für Hin- und Heimweg passend zum Schichtplan:', url: APP_URL };
+  try {
+    if (navigator.share) { await navigator.share(data); return; }
+    await navigator.clipboard.writeText(APP_URL);
+    $('btnShare').textContent = 'Link kopiert ✓';
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    prompt('Link zum Kopieren:', APP_URL);
+  }
+  setTimeout(shareLabel, 2500);
+});
 
 // ---------- Hauptablauf ----------
 let busy = false;

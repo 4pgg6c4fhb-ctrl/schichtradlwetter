@@ -144,6 +144,9 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; list-st
 details summary::-webkit-details-marker { display: none; }
 details p { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
 
+/* Teilen */
+.share { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 4px; }
+
 /* Fußzeile */
 .foot { font-size: 11px; line-height: 1.6; color: var(--dim); text-align: center; margin: 18px 4px 0; }
 .foot b { color: var(--muted); font-weight: 600; }
@@ -207,6 +210,8 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
       <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble, ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
     </details>
   </section>
+
+  <button class="btn share" id="btnShare" type="button"></button>
 
   <footer class="foot">
     <div><b>© 2026 SchichtRADWETTER</b> · Idee: Tom Mo · Alle Rechte vorbehalten</div>
