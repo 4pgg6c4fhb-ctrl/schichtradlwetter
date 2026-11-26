@@ -12,13 +12,14 @@ const DEFAULTS = {
   snowCm: '1',
   rideKmh: '20',
   l1: '10', l1t: 'Handschuhe, Kappe, Fleece, Iso, Windjacke, Isohose',
-  l2: '15', l2t: 'Fleece, Windjacke, Radhose',
+  l2: '15', l2t: 'Fleece, Windjacke, lange Radhose',
   l3: '20', l3t: 'Fleece, lange Radhose',
   l4t: 'Alles kurz',
 };
 function settings() {
   const raw = load('settings', {});
   if ((raw.v || 1) < SETTINGS_VERSION) delete raw.heavyMm;   // alte Grenze (2 mm) durch neue ersetzen
+  if (raw.l2t === 'Fleece, Windjacke, Radhose') raw.l2t = DEFAULTS.l2t;   // alter Standardtext
   return Object.assign({}, DEFAULTS, raw);
 }
 const num = (x, fb) => { const v = parseFloat(String(x).replace(',', '.')); return isNum(v) ? v : fb; };

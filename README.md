@@ -16,7 +16,7 @@ Eine Seite:
 | | Standard |
 | --- | --- |
 | Kleidung unter 10 °C gefühlt | Handschuhe, Kappe, Fleece, Iso, Windjacke, Isohose |
-| unter 15 °C | Fleece, Windjacke, Radhose |
+| unter 15 °C | Fleece, Windjacke, lange Radhose |
 | unter 20 °C | Fleece, lange Radhose |
 | darüber | Alles kurz |
 | Zu viel Regen | ab 0,5 mm/h (mehr als Tröpfeln) |
