@@ -268,15 +268,25 @@ function renderSummary(items, s) {
   $('shiftSummary').innerHTML = head + (list.length ? `<ul class="notes">${list.join('')}</ul>` : '');
 }
 
+// Ein Fahrt-Block: nur Status, Warnungen und Kleidung (Zahlen stehen bei „Nächste Fahrt“).
 function rideHtml(r, free = false) {
   const name = `<span class="ride-name">${icon(r.name === 'Hinfahrt' ? (free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
-  if (!r.a) return `<div class="ride none"><div class="ride-row">${name}</div><div class="ride-vals">noch keine Vorhersage</div></div>`;
+  if (!r.a) return `<div class="ride none"><div class="ride-row">${name}</div><div class="ride-why muted">noch keine Vorhersage</div></div>`;
   const a = r.a;
   return `<div class="ride ${a.verdict}">
     <div class="ride-row">${name}${pill(a.verdict)}</div>
-    <div class="ride-vals num"><span>gefühlt <b>${deg(r.h.feel)}</b></span><span>Regen <b>${pct(r.h.prob)}</b></span><span>Feuchte <b>${pct(r.h.rh)}</b></span>${a.pSnow >= 5 ? `<span>Schnee <b>${pct(a.pSnow)}</b></span>` : ''}</div>
     ${a.reasons.length ? `<div class="ride-why">${esc(a.reasons.join(' · '))}</div>` : ''}
     <div class="ride-cloth">${esc(a.clothes)}</div></div>`;
+}
+// Beide Fahrten ohne Warnung und mit gleicher Kleidung → ein gemeinsamer Block.
+function ridesHtml(rides, free) {
+  const [h, r] = rides;
+  if (rides.length === 2 && h.a && r.a && h.a.verdict === 'ok' && r.a.verdict === 'ok' && h.a.clothes === r.a.clothes) {
+    return `<div class="ride ok">
+      <div class="ride-row"><span class="ride-name">${icon('bike')}Hin- und Rückfahrt ${hr(h.from)}–${hr(h.to)} · ${hr(r.from)}–${hr(r.to)} Uhr</span>${pill('ok')}</div>
+      <div class="ride-cloth">${esc(h.a.clothes)}</div></div>`;
+  }
+  return rides.map((x) => rideHtml(x, free)).join('');
 }
 
 function renderShifts(items) {
@@ -289,7 +299,7 @@ function renderShifts(items) {
       <div class="date${it.i === 0 ? ' today' : ''}"><div class="wd">${it.i === 0 ? 'Heute' : wdFmt.format(it.d)}</div><div class="d">${it.d.getDate()}</div></div>
       <div>
         <div class="shift-title"><span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span>${title}</span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
-        ${it.rides.map((r) => rideHtml(r, it.sh.free)).join('')}
+        ${ridesHtml(it.rides, it.sh.free)}
       </div></div>`;
   }).join('');
 }
