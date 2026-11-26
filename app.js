@@ -219,6 +219,8 @@ function renderCurrent(items) {
   el.className = `card next ${worst}`;
   el.hidden = false;
   const trend = it.rides.some((r) => r.a?.trend);
+  const withA = it.rides.filter((r) => r.a);
+  const sameClothes = withA.length === 2 && withA[0].a.clothes === withA[1].a.clothes;
   const rideBlock = (r) => {
     const head = `<div class="cur-name">${icon(r.name === 'Hinfahrt' ? (it.sh.free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</div>`;
     if (!r.a) return `<div class="cur-ride">${head}<div class="hint">noch keine Vorhersage</div></div>`;
@@ -234,14 +236,14 @@ function renderCurrent(items) {
         <div class="metric"><div class="v">${pct(a.pSnow)}</div><div class="l">${icon('snow')}Schnee</div></div>
         <div class="metric"><div class="v">${pct(r.h.rh)}</div><div class="l">${icon('humid')}Feuchte</div></div>
       </div>
-      <div class="overline">Kleidung</div>
-      ${chips(a.clothes)}</div>`;
+      ${sameClothes ? '' : `<div class="overline">Kleidung</div>${chips(a.clothes)}`}</div>`;
   };
   const past = it.rides.length === 1 && it.rides[0].name === 'Rückfahrt' ? '<div class="hint">Hinfahrt bereits vorbei</div>' : '';
   el.innerHTML = `
     <div class="head"><span class="overline">Aktuelle Schicht · ${dayLabel(it.i, it.d)}</span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
     <div class="cur-badge">${shiftBadge(it)}</div>
-    ${past}${it.rides.map(rideBlock).join('')}`;
+    ${past}${it.rides.map(rideBlock).join('')}
+    ${sameClothes ? `<div class="cur-ride"><div class="overline">Kleidung · Hin- und Rückfahrt</div>${chips(withA[0].a.clothes)}</div>` : ''}`;
   return it;
 }
 
