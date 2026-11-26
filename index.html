@@ -95,6 +95,17 @@ header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
 .chip { font-size: 13px; font-weight: 500; padding: 5px 10px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); }
 .chip.extra { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 
+/* Aktuelle Schicht */
+.cur-badge { margin: 10px 0 2px; }
+.cur-ride { padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border); }
+.cur-ride .status-line { margin: 0 0 4px; }
+.cur-name { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.cur-name svg.i { width: 15px; height: 15px; }
+.metrics.four { grid-template-columns: repeat(4, 1fr); margin: 10px 0 12px; }
+.metrics.four .metric { padding: 8px 10px; }
+.metrics.four .v { font-size: 18px; }
+.metrics.four .l { font-size: 11px; }
+
 /* Zusammenfassung */
 .verdict-line { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
 .verdict-line svg.i { width: 20px; height: 20px; margin-top: 1px; }
@@ -193,7 +204,7 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
   </section>
 
   <section class="card">
-    <div class="section-head"><h2>Fahrten</h2><span class="overline">Hin- &amp; Rückfahrt</span></div>
+    <div class="section-head"><h2>Weitere Tage</h2><span class="overline">Hin- &amp; Rückfahrt</span></div>
     <div id="shifts"></div>
   </section>
 

@@ -202,35 +202,47 @@ function chips(text) {
     `${extra.map((x) => `<span class="chip extra">+ ${esc(x)}</span>`).join('')}</div>`;
 }
 
-function renderNext(items) {
+// Kopf eines Tages: Schicht-Abzeichen
+function shiftBadge(it) {
+  const title = it.sh.free
+    ? 'Frei'
+    : `${it.sh.name}schicht <small>${fmtH(it.sh.s)}–${fmtH((it.sh.s + it.sh.len) % 24)} Uhr</small>`;
+  return `<span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span>${title}</span>`;
+}
+
+// Aktuelle Schicht: Hin- und Rückfahrt mit Status, Werten und Kleidung.
+function renderCurrent(items) {
   const el = $('next');
-  let found = null;
-  for (const it of items) {
-    const r = it.rides.find((x) => x.a);
-    if (r) { found = { it, r }; break; }
-  }
-  if (!found) { el.hidden = true; return; }
-  const { it, r } = found;
-  const a = r.a;
-  el.className = `card next ${a.verdict}`;
+  const it = items.find((x) => x.rides.length);
+  if (!it) { el.hidden = true; return null; }
+  const worst = worstOf(it.rides) || 'ok';
+  el.className = `card next ${worst}`;
   el.hidden = false;
-  const sub = a.reasons.length ? a.reasons.join(' · ') : 'Keine Wetterprobleme';
+  const trend = it.rides.some((r) => r.a?.trend);
+  const rideBlock = (r) => {
+    const head = `<div class="cur-name">${icon(r.name === 'Hinfahrt' ? (it.sh.free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</div>`;
+    if (!r.a) return `<div class="cur-ride">${head}<div class="hint">noch keine Vorhersage</div></div>`;
+    const a = r.a;
+    return `<div class="cur-ride">
+      <div class="status-line">
+        <div class="status-icon ${a.verdict}">${icon(a.verdict)}</div>
+        <div class="status-text">${head}<b>${VERDICT[a.verdict]}</b>${a.reasons.length ? `<span>${esc(a.reasons.join(' · '))}</span>` : ''}</div>
+      </div>
+      <div class="metrics four num">
+        <div class="metric"><div class="v">${deg(r.h.feel)}</div><div class="l">${icon('bike')}Gefühlt</div></div>
+        <div class="metric"><div class="v">${pct(r.h.prob)}</div><div class="l">${icon('drop')}Regen</div></div>
+        <div class="metric"><div class="v">${pct(a.pSnow)}</div><div class="l">${icon('snow')}Schnee</div></div>
+        <div class="metric"><div class="v">${pct(r.h.rh)}</div><div class="l">${icon('humid')}Feuchte</div></div>
+      </div>
+      <div class="overline">Kleidung</div>
+      ${chips(a.clothes)}</div>`;
+  };
+  const past = it.rides.length === 1 && it.rides[0].name === 'Rückfahrt' ? '<div class="hint">Hinfahrt bereits vorbei</div>' : '';
   el.innerHTML = `
-    <div class="head"><span class="overline">Nächste Fahrt</span>${a.trend ? '<span class="tag">Trend</span>' : ''}</div>
-    <div class="status-line">
-      <div class="status-icon ${a.verdict}">${icon(a.verdict)}</div>
-      <div class="status-text"><b>${VERDICT[a.verdict]}</b><span>${dayLabel(it.i, it.d)} · ${r.name} ${hr(r.from)}–${hr(r.to)} Uhr · ${esc(sub)}</span></div>
-    </div>
-    <div class="metrics num">
-      <div class="metric"><div class="v">${deg(r.h.feel)}</div><div class="l">${icon('bike')}Gefühlt</div></div>
-      <div class="metric"><div class="v">${deg(r.h.temp)}</div><div class="l">${icon('thermo')}Luft</div></div>
-      <div class="metric"><div class="v">${pct(r.h.rh)}</div><div class="l">${icon('humid')}Feuchte</div></div>
-      <div class="metric"><div class="v">${pct(r.h.prob)}</div><div class="l">${icon('drop')}Regen</div></div>
-      <div class="metric"><div class="v">${pct(a.pHeavy)}</div><div class="l">${icon('drop')}Viel Regen</div></div>
-      <div class="metric"><div class="v">${pct(a.pSnow)}</div><div class="l">${icon('snow')}Schnee</div></div>
-    </div>
-    <div class="overline">Kleidung</div>
-    ${chips(a.clothes)}`;
+    <div class="head"><span class="overline">Aktuelle Schicht · ${dayLabel(it.i, it.d)}</span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
+    <div class="cur-badge">${shiftBadge(it)}</div>
+    ${past}${it.rides.map(rideBlock).join('')}`;
+  return it;
 }
 
 function renderSummary(items, s) {
@@ -268,37 +280,31 @@ function renderSummary(items, s) {
   $('shiftSummary').innerHTML = head + (list.length ? `<ul class="notes">${list.join('')}</ul>` : '');
 }
 
-// Ein Fahrt-Block: nur Status, Warnungen und Kleidung (Zahlen stehen bei „Nächste Fahrt“).
+// Ein Fahrt-Block in der Liste: nur ob es geht und welche Gefahren es gibt.
 function rideHtml(r, free = false) {
   const name = `<span class="ride-name">${icon(r.name === 'Hinfahrt' ? (free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
-  if (!r.a) return `<div class="ride none"><div class="ride-row">${name}</div><div class="ride-why muted">noch keine Vorhersage</div></div>`;
+  if (!r.a) return `<div class="ride none"><div class="ride-row">${name}<span class="hint">keine Vorhersage</span></div></div>`;
   const a = r.a;
   return `<div class="ride ${a.verdict}">
     <div class="ride-row">${name}${pill(a.verdict)}</div>
-    ${a.reasons.length ? `<div class="ride-why">${esc(a.reasons.join(' · '))}</div>` : ''}
-    <div class="ride-cloth">${esc(a.clothes)}</div></div>`;
+    ${a.reasons.length ? `<div class="ride-why">${esc(a.reasons.join(' · '))}</div>` : ''}</div>`;
 }
-// Beide Fahrten ohne Warnung und mit gleicher Kleidung → ein gemeinsamer Block.
+// Beide Fahrten ohne Gefahr → eine Zeile.
 function ridesHtml(rides, free) {
   const [h, r] = rides;
-  if (rides.length === 2 && h.a && r.a && h.a.verdict === 'ok' && r.a.verdict === 'ok' && h.a.clothes === r.a.clothes) {
-    return `<div class="ride ok">
-      <div class="ride-row"><span class="ride-name">${icon('bike')}Hin- und Rückfahrt ${hr(h.from)}–${hr(h.to)} · ${hr(r.from)}–${hr(r.to)} Uhr</span>${pill('ok')}</div>
-      <div class="ride-cloth">${esc(h.a.clothes)}</div></div>`;
+  if (rides.length === 2 && h.a?.verdict === 'ok' && r.a?.verdict === 'ok') {
+    return `<div class="ride ok"><div class="ride-row"><span class="ride-name">${icon('bike')}Hin- und Rückfahrt</span>${pill('ok')}</div></div>`;
   }
   return rides.map((x) => rideHtml(x, free)).join('');
 }
 
-function renderShifts(items) {
-  $('shifts').innerHTML = items.map((it) => {
+function renderShifts(items, current) {
+  $('shifts').innerHTML = items.filter((it) => it !== current).map((it) => {
     const trend = it.rides.some((r) => r.a?.trend);
-    const title = it.sh.free
-      ? `Frei <small>Hinfahrt ${fmtH(it.sh.out)} · Rückfahrt ${fmtH(it.sh.back)} Uhr</small>`
-      : `${it.sh.name}schicht <small>${fmtH(it.sh.s)}–${fmtH((it.sh.s + it.sh.len) % 24)} Uhr</small>`;
     return `<div class="shift">
       <div class="date${it.i === 0 ? ' today' : ''}"><div class="wd">${it.i === 0 ? 'Heute' : wdFmt.format(it.d)}</div><div class="d">${it.d.getDate()}</div></div>
       <div>
-        <div class="shift-title"><span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span>${title}</span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
+        <div class="shift-title">${shiftBadge(it)}${trend ? '<span class="tag">Trend</span>' : ''}</div>
         ${ridesHtml(it.rides, it.sh.free)}
       </div></div>`;
   }).join('');
@@ -354,9 +360,9 @@ async function run() {
       (isNum(h0?.temp) ? ` · jetzt ${deg(h0.temp)}, gefühlt ${deg(h0.feel)}` : '') + (pos.stale ? ' · letzter Standort' : '');
 
     const items = planShifts(hours, { gs, om, ecm }, s, p);
-    renderNext(items);
+    const current = renderCurrent(items);
     renderSummary(items, s);
-    renderShifts(items);
+    renderShifts(items, current);
 
     const names = { nwp: 'GeoSphere', ens: 'GeoSphere-Ensemble', now: 'Radar' };
     const ok = Object.keys(gs.res).map((k) => names[k]);
