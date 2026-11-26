@@ -74,27 +74,30 @@ async function fetchGeoSphere(lat, lon) {
   return { res, errors };
 }
 
-// Open-Meteo Ensemble (DWD ICON-D2-EPS, 20 Läufe, 2 km): kostenlos, ohne Key.
-// Pro Stunde: Anteil der Läufe mit >= 0,1 mm = Wahrscheinlichkeit; Median-Menge; Mittelwerte für Rest.
-async function fetchOpenMeteo(lat, lon) {
+// Open-Meteo Ensemble-API: kostenlos, ohne Key. Pro Stunde werden die Mengen aller Läufe gespeichert,
+// damit sich beliebige Schwellen (0,1 mm „nass“, x mm „zu stark zum Radeln“) auszählen lassen.
+//  - icon_d2_eps: DWD ICON-D2, 20 Läufe, 2 km, ~2 Tage
+//  - ecmwf_ifs025: ECMWF, 51 Läufe, 25 km, 12 Tage (für die Schichten weiter voraus)
+async function fetchEnsemble(model, days, ttlMs, lat, lon) {
   const vars = ['precipitation', 'temperature_2m', 'cloud_cover', 'wind_speed_10m', 'wind_gusts_10m'];
   const url = `${OM}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=${vars.join(',')}` +
-    '&models=icon_d2_eps&forecast_days=3&timezone=GMT&wind_speed_unit=ms';
+    `&models=${model}&forecast_days=${days}&timezone=GMT&wind_speed_unit=ms`;
   try {
-    const json = await cachedJson(`om-${lat.toFixed(3)},${lon.toFixed(3)}`, 15 * 60e3, url);
+    const json = await cachedJson(`om-${model}-${lat.toFixed(3)},${lon.toFixed(3)}`, ttlMs, url);
     if (json.error) throw new Error(json.reason || 'Fehler');
     const h = json.hourly || {};
     const members = (name) => Object.keys(h).filter((k) => k === name || k.startsWith(name + '_member'));
     const pk = members('precipitation');
+    const times = h.time || [];
     const rows = new Map();
-    (h.time || []).forEach((t, i) => {
+    times.forEach((t, i) => {
       const prec = pk.map((k) => h[k][i]).filter(isNum).sort((a, b) => a - b);
       if (!prec.length) return;
+      // 3-h-Summe je Lauf (Stunde davor, diese, danach): grobe Modelle verschmieren Schauer über mehrere Stunden.
+      const prec3 = pk.map((k) => [h[k][i - 1], h[k][i], h[k][i + 1]].filter(isNum).reduce((a, b) => a + b, 0)).sort((a, b) => a - b);
       const at = (name) => avg(members(name).map((k) => h[k][i]));
       rows.set(Date.parse(t + 'Z'), {
-        prob: 100 * prec.filter((x) => x >= THRESHOLD_MM).length / prec.length,
-        n: prec.length,
-        mm: prec[Math.floor(prec.length / 2)],
+        prec, prec3, n: prec.length, mm: prec[Math.floor(prec.length / 2)],
         temp: at('temperature_2m'), cloud: at('cloud_cover'), wind: at('wind_speed_10m'), gust: at('wind_gusts_10m'),
       });
     });
@@ -104,6 +107,11 @@ async function fetchOpenMeteo(lat, lon) {
     return { error: e.status === 429 ? 'Tageslimit erreicht, später erneut' : e.message };
   }
 }
+const fetchOpenMeteo = (lat, lon) => fetchEnsemble('icon_d2_eps', 3, 15 * 60e3, lat, lon);
+const fetchEcmwf = (lat, lon) => fetchEnsemble('ecmwf_ifs025', 12, 60 * 60e3, lat, lon);
+
+// Anteil (%) der Werte >= thr
+const fracAbove = (arr, thr) => (arr && arr.length ? 100 * arr.filter((x) => x >= thr).length / arr.length : null);
 
 // ---------- Wahrscheinlichkeits-Rechnung ----------
 // P(Niederschlag > thr) aus Ensemble-Perzentilen (10/50/90) durch stückweise lineare Interpolation.
@@ -115,10 +123,10 @@ function probFromPercentiles(p10, p50, p90, thr = THRESHOLD_MM) {
   return 10 * clamp(p90 / thr, 0, 1);       // oberes Ende: nur noch wenige Läufe nass
 }
 
-// Deterministische Menge → weiche Wahrscheinlichkeit (0,02 mm ≈ 0 %, ≥0,4 mm ≈ 100 %).
-function probFromAmount(mm) {
+// Deterministische Menge → weiche Wahrscheinlichkeit (unter lo ≈ 0 %, über hi ≈ 100 %).
+function probFromAmount(mm, lo = 0.02, hi = 0.4) {
   if (!isNum(mm)) return null;
-  const x = clamp((mm - 0.02) / (0.4 - 0.02), 0, 1);
+  const x = clamp((mm - lo) / (hi - lo), 0, 1);
   return 100 * x * x * (3 - 2 * x);
 }
 
@@ -159,12 +167,16 @@ function symbol(h) {
 }
 
 // ---------- Zusammenführen ----------
-function buildHours(pos, gs, om) {
+// opts.heavyMm: ab dieser Menge pro Stunde wird nicht geradelt. opts.hours: wie viele Stunden ab jetzt.
+function buildHours(pos, gs, om, ecm, opts = {}) {
+  const heavy = opts.heavyMm || 2;
+  const count = opts.hours || HOURS_SHOWN;
   const now = Date.now();
   const startHour = Math.ceil(now / HOUR) * HOUR;                 // nächste volle Stunde (Ende der laufenden Stunde)
   const nwp = gs.res.nwp?.rows || new Map();
   const ens = gs.res.ens?.rows || new Map();
   const omr = om.rows || new Map();
+  const ecr = ecm?.rows || new Map();
 
   // Nowcast (15-min-Summen, Intervall endet am Zeitstempel) auf Stunden aufsummieren.
   const nowHourly = new Map();
@@ -177,40 +189,58 @@ function buildHours(pos, gs, om) {
   }
 
   const hours = [];
-  for (let i = 0; i < HOURS_SHOWN; i++) {
+  for (let i = 0; i < count; i++) {
     const t = startHour + i * HOUR;
-    const n = nwp.get(t) || {}, e = ens.get(t) || {}, o = omr.get(t) || {};
+    const n = nwp.get(t) || {}, e = ens.get(t) || {}, o = omr.get(t) || {}, x = ecr.get(t);
     const nc = nowHourly.get(t);
-    const nowcastMm = nc && nc.n >= 3 ? nc.mm * 4 / nc.n : null;   // auf volle Stunde hochrechnen, falls unvollständig
+    const nowcastMm = nc && nc.n >= 2 ? nc.mm * 4 / nc.n : null;   // auf volle Stunde hochrechnen, falls unvollständig
+    const lead = (t - now) / HOUR;
+    const day = sunUp(new Date(t - HOUR / 2), pos.lat, pos.lon);
 
     const pEns = probFromPercentiles(e.tp_p10, e.tp_p50, e.tp_p90);
     const pNwp = probFromAmount(n.tp);
-    const pOm = isNum(o.prob) ? o.prob : null;
-    const pNc = probFromAmount(nowcastMm);
-    const lead = (t - now) / HOUR;
-    const wNc = isNum(pNc) ? clamp(1 - (lead - 1) / NOWCAST_HOURS, 0, 1) * 0.7 : 0;
+    const pOm = fracAbove(o.prec, THRESHOLD_MM);
+    let h;
 
-    const pModels = combine([{ p: pEns, w: WEIGHTS.ens }, { p: pNwp, w: WEIGHTS.nwp }, { p: pOm, w: WEIGHTS.om }]);
-    const prob = combine([{ p: pModels, w: isNum(pModels) ? 1 - wNc : 0 }, { p: pNc, w: wNc }]);
+    if ([pEns, pNwp, pOm].some(isNum)) {
+      // Kurzfrist: GeoSphere + ICON-D2 (+ Nowcast)
+      const pNc = probFromAmount(nowcastMm);
+      const wNc = isNum(pNc) ? clamp(1 - (lead - 1) / NOWCAST_HOURS, 0, 1) * 0.7 : 0;
+      const mix = (a, b, c, d) => {
+        const m = combine([{ p: a, w: WEIGHTS.ens }, { p: b, w: WEIGHTS.nwp }, { p: c, w: WEIGHTS.om }]);
+        return combine([{ p: m, w: isNum(m) ? 1 - wNc : 0 }, { p: d, w: wNc }]);
+      };
+      const prob = mix(pEns, pNwp, pOm, pNc);
+      const pHeavy = mix(probFromPercentiles(e.tp_p10, e.tp_p50, e.tp_p90, heavy),
+        probFromAmount(n.tp, heavy * 0.5, heavy * 1.5), fracAbove(o.prec, heavy),
+        probFromAmount(nowcastMm, heavy * 0.5, heavy * 1.5));
 
-    const mmModels = avg([n.tp, o.mm, e.tp_p50]);
-    const mm = wNc && isNum(nowcastMm) ? wNc * nowcastMm + (1 - wNc) * (mmModels ?? nowcastMm) : mmModels;
+      const mmModels = avg([n.tp, o.mm, e.tp_p50]);
+      const mm = wNc && isNum(nowcastMm) ? wNc * nowcastMm + (1 - wNc) * (mmModels ?? nowcastMm) : mmModels;
+      const temp = avg([n['2t'], o.temp, nc ? avg(nc.t2m) : null]);
+      const windN = isNum(n['10u']) && isNum(n['10v']) ? Math.hypot(n['10u'], n['10v']) : null;
+      const wind = avg([windN, o.wind]);
+      h = {
+        t, prob, pHeavy, mm, temp, wind, day, range: 'kurz',
+        gust: avg([n['10fg'], o.gust]),
+        cloud: avg([n.tcc, o.cloud]),
+        snow: isNum(n.sf) && isNum(n.rain) ? n.sf > n.rain : (isNum(temp) && temp < 0.5),
+        tLo: e['2t_p10'], tHi: e['2t_p90'],
+        src: { pEns, pNwp, pOm, omN: o.n, pNc, wNc, nwpMm: n.tp, omMm: o.mm, ens: [e.tp_p10, e.tp_p50, e.tp_p90], nowcastMm },
+      };
+    } else if (x) {
+      // Langfrist: ECMWF-Ensemble (grob, Trend)
+      h = {
+        t, prob: fracAbove(x.prec, THRESHOLD_MM), pHeavy: fracAbove(x.prec3, heavy * 1.5),
+        mm: x.mm, temp: x.temp, wind: x.wind, gust: x.gust, cloud: x.cloud, day, range: 'lang',
+        snow: isNum(x.temp) && x.temp < 0.5,
+        src: { pEcm: fracAbove(x.prec, THRESHOLD_MM), ecmN: x.n, ecmMm: x.mm },
+      };
+    } else continue;
 
-    const temp = avg([n['2t'], o.temp, nc ? avg(nc.t2m) : null]);
-    const windN = isNum(n['10u']) && isNum(n['10v']) ? Math.hypot(n['10u'], n['10v']) : null;
-    const wind = avg([windN, o.wind]);
-    const gust = avg([n['10fg'], o.gust]);
-    const cloud = avg([n.tcc, o.cloud]);
-    const snow = isNum(n.sf) && isNum(n.rain) ? n.sf > n.rain : (isNum(temp) && temp < 0.5);
-    const day = sunUp(new Date(t - HOUR / 2), pos.lat, pos.lon);
-
-    const h = {
-      t, prob, mm, temp, wind, gust, cloud, snow, day,
-      tLo: e['2t_p10'], tHi: e['2t_p90'],
-      src: { pEns, pNwp, pOm, omN: o.n, pNc, wNc, nwpMm: n.tp, omMm: o.mm, ens: [e.tp_p10, e.tp_p50, e.tp_p90], nowcastMm },
-    };
+    h.feel = rideFeel(h.temp, h.wind);
     [h.icon, h.desc] = symbol(h);
-    if ([prob, temp, cloud].some(isNum)) hours.push(h);
+    if ([h.prob, h.temp, h.cloud].some(isNum)) hours.push(h);
   }
   return hours;
 }
@@ -227,60 +257,66 @@ function rideFeel(temp, windMs) {
   return 13.12 + 0.6215 * temp - 11.37 * p + 0.3965 * temp * p;
 }
 
-// hours: Stunden-Objekte aus buildHours für den gewünschten Zeitraum.
+// Kleidung + Warnungen für eine Liste von Stunden.
+// items/warnings: [Symbol, Text, Stufe 0–3] – Stufe wird als Punkte unter dem Symbol gezeigt.
 function clothing(hours) {
   const hs = hours.filter((h) => isNum(h.temp));
   if (!hs.length) return null;
-  const feels = hs.map((h) => rideFeel(h.temp, h.wind)).filter(isNum);
+  const feels = hs.map((h) => h.feel ?? rideFeel(h.temp, h.wind)).filter(isNum);
   const fMin = Math.min(...feels), fMax = Math.max(...feels);
   const tMin = Math.min(...hs.map((h) => h.temp)), tMax = Math.max(...hs.map((h) => h.temp));
-  const probs = hs.map((h) => h.prob).filter(isNum);
-  const pMax = probs.length ? Math.max(...probs) : 0;
+  const max = (k) => { const v = hs.map((h) => h[k]).filter(isNum); return v.length ? Math.max(...v) : null; };
+  const pMax = max('prob') ?? 0;
+  const pHeavy = max('pHeavy') ?? 0;
   const mmSum = hs.reduce((s, h) => s + (isNum(h.mm) ? h.mm : 0), 0);
-  const gusts = hs.map((h) => h.gust).filter(isNum);
-  const gustKmh = gusts.length ? Math.max(...gusts) * 3.6 : null;
+  const gustKmh = isNum(max('gust')) ? max('gust') * 3.6 : null;
   const snowy = hs.some((h) => h.snow && (h.prob ?? 0) >= 30);
   const dark = hs.some((h) => !h.day);
 
   const items = [];
   // Hände
-  if (fMin < -8) items.push(['🧤', 'Dicke Winterhandschuhe (Lobster/Fäustlinge)']);
-  else if (fMin < 2) items.push(['🧤', 'Winterhandschuhe']);
-  else if (fMin < 10) items.push(['🧤', 'Dünne Langfinger-Handschuhe']);
-  // Kopf
-  if (fMin < -8) items.push(['🧣', 'Sturmhaube oder Mütze + Buff/Halstuch']);
-  else if (fMin < 2) items.push(['🧢', 'Mütze unter dem Helm + Buff']);
-  else if (fMin < 8) items.push(['🧢', 'Stirnband / Ohrenschutz']);
+  if (fMin < -8) items.push(['🧤', 'Dicke Winterhandschuhe (Lobster/Fäustlinge)', 3]);
+  else if (fMin < 2) items.push(['🧤', 'Winterhandschuhe', 2]);
+  else if (fMin < 10) items.push(['🧤', 'Dünne Langfinger-Handschuhe', 1]);
+  // Kopf / Hals
+  if (fMin < -8) items.push(['🧣', 'Sturmhaube oder Mütze + Buff', 3]);
+  else if (fMin < 2) items.push(['🧣', 'Mütze unter dem Helm + Buff', 2]);
+  else if (fMin < 8) items.push(['🧣', 'Stirnband / Ohrenschutz', 1]);
   // Oberkörper
-  if (fMin < 3) items.push(['🧥', 'Winterjacke (winddicht) + warme Unterschicht']);
-  else if (fMin < 10) items.push(['🧥', 'Softshell- oder Thermojacke']);
-  else if (fMin < 16) items.push(['👕', 'Langarm + Windweste']);
-  else if (fMin < 21) items.push(['👕', 'Kurzarm + Armlinge']);
-  else items.push(['👕', 'Kurzarm']);
+  if (fMin < 3) items.push(['🧥', 'Winterjacke (winddicht) + warme Unterschicht', 3]);
+  else if (fMin < 10) items.push(['🧥', 'Softshell- oder Thermojacke', 2]);
+  else if (fMin < 16) items.push(['🧥', 'Langarm + Windweste', 1]);
+  else if (fMin < 21) items.push(['👕', 'Kurzarm + Armlinge', 1]);
+  else items.push(['👕', 'Kurzarm', 0]);
   // Beine
-  if (fMin < 5) items.push(['👖', 'Lange Thermohose']);
-  else if (fMin < 14) items.push(['👖', 'Lange Hose / Beinlinge']);
-  else if (fMin < 18) items.push(['🩳', 'Knielinge oder kurze Hose']);
-  else items.push(['🩳', 'Kurze Hose']);
+  if (fMin < 5) items.push(['👖', 'Lange Thermohose', 3]);
+  else if (fMin < 14) items.push(['👖', 'Lange Hose / Beinlinge', 2]);
+  else if (fMin < 18) items.push(['🩳', 'Knielinge oder kurze Hose', 1]);
+  else items.push(['🩳', 'Kurze Hose', 0]);
   // Füße
-  if (fMin < 0) items.push(['🧦', 'Winterschuhe oder Neopren-Überschuhe + warme Socken']);
-  else if (fMin < 6) items.push(['🧦', 'Überschuhe / warme Socken']);
+  if (fMin < 0) items.push(['🥾', 'Winterschuhe oder Neopren-Überschuhe + warme Socken', 3]);
+  else if (fMin < 6) items.push(['🧦', 'Überschuhe / warme Socken', 2]);
   // Regen
-  if (pMax >= 60 || mmSum >= 1) items.push(['🌧️', 'Regenjacke + Regenhose' + (fMin < 10 ? ' + wasserdichte Überschuhe' : '') + ' anziehen']);
-  else if (pMax >= 30) items.push(['☂️', 'Regenjacke einpacken']);
+  if (pMax >= 60 || mmSum >= 1) items.push(['☔', 'Regenjacke + Regenhose anziehen' + (fMin < 10 ? ' + wasserdichte Überschuhe' : ''), 3]);
+  else if (pMax >= 30) items.push(['🌂', 'Regenjacke einpacken', 1]);
   // Licht
-  if (dark) items.push(['💡', 'Licht + Reflektoren (Dunkelheit)']);
+  if (dark) items.push(['🔦', 'Licht + Reflektoren (Dunkelheit)', 0]);
   // Zwiebelprinzip
-  if (fMax - fMin >= 8) items.push(['🧅', `Zwiebelprinzip: ${fmt0(tMin)}° bis ${fmt0(tMax)}° – Schicht zum Ausziehen`]);
+  if (fMax - fMin >= 8) items.push(['🧅', `Zwiebelprinzip: ${fmt0(tMin)}° bis ${fmt0(tMax)}°, Schicht zum Ausziehen`, 0]);
 
   const warnings = [];
-  if (tMin <= 1 && (pMax >= 30 || hs.some((h) => isNum(h.temp) && h.temp <= 0))) warnings.push('⚠️ Glättegefahr möglich');
-  if (snowy) warnings.push('❄️ Schneefall möglich');
-  if (isNum(gustKmh) && gustKmh >= 50) warnings.push(`💨 Sturmböen bis ${fmt0(gustKmh)} km/h`);
-  else if (isNum(gustKmh) && gustKmh >= 35) warnings.push(`💨 Böen bis ${fmt0(gustKmh)} km/h`);
+  const ice = tMin <= 1 && (pMax >= 30 || snowy);
+  if (pHeavy >= 25) warnings.push(['🌧️', `Starkregen ${fmt0(pHeavy)} %`, 0]);
+  if (ice) warnings.push(['🧊', 'Glättegefahr', 0]);
+  if (snowy) warnings.push(['❄️', 'Schneefall möglich', 0]);
+  if (isNum(gustKmh) && gustKmh >= 35) warnings.push(['💨', `Böen bis ${fmt0(gustKmh)} km/h`, 0]);
 
-  const summary = `${fmt0(tMin)}° bis ${fmt0(tMax)}° (gefühlt am Rad ${fmt0(fMin)}°), Regen max. ${fmt0(pMax)} %` +
+  // Ampel: fahren / aufpassen / nicht fahren
+  let verdict = 'ok';
+  if (pHeavy >= 25 || ice || (isNum(gustKmh) && gustKmh >= 60) || (snowy && pMax >= 50)) verdict = 'warn';
+  if (pHeavy >= 50) verdict = 'stop';
+
+  const summary = `${fmt0(tMin)}° bis ${fmt0(tMax)}°, gefühlt am Rad ${fmt0(fMin)}°, Regen max. ${fmt0(pMax)} %` +
     (mmSum >= 0.1 ? `, ${fmt1(mmSum)} mm` : '');
-  return { items, warnings, summary, tMin, tMax, fMin, pMax, mmSum };
+  return { items, warnings, verdict, summary, tMin, tMax, fMin, pMax, pHeavy, mmSum, range: hs.some((h) => h.range === 'lang') ? 'lang' : 'kurz' };
 }
-
