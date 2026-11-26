@@ -54,9 +54,9 @@ function getPosition() {
 
 // ---------- Schichtrad ----------
 // 10-Tage-Rad: 2× Früh, 2× Spät, 2× Nacht, 4 Tage frei.
-const EARLY = { name: 'Früh', icon: '🌅', color: 'c-orange', s: 6, len: 8 };
-const LATE = { name: 'Spät', icon: '🌇', color: 'c-purple', s: 14, len: 8 };
-const NIGHT = { name: 'Nacht', icon: '🌙', color: 'c-night', s: 22, len: 8 };
+const EARLY = { name: 'Früh', icon: 'sunrise', cls: 'early', s: 6, len: 8 };
+const LATE = { name: 'Spät', icon: 'sunset', cls: 'late', s: 14, len: 8 };
+const NIGHT = { name: 'Nacht', icon: 'moon', cls: 'night', s: 22, len: 8 };
 const CYCLE = [EARLY, EARLY, LATE, LATE, NIGHT, NIGHT, null, null, null, null];
 const DAY = 86400e3;
 const SNOW_BEFORE_H = 6;   // Hinweg: Neuschnee der letzten 6 Stunden zählt
@@ -107,18 +107,51 @@ function planShifts(hours, data, s, p) {
   return items;
 }
 
+// ---------- Symbole (Linien-Icons, 24×24) ----------
+const ICONS = {
+  bike: '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  ok: '<circle cx="12" cy="12" r="10"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+  warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+  stop: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  sunrise: '<path d="M12 2v8M4.93 10.93l1.41 1.41M2 18h2M20 18h2M19.07 10.93l-1.41 1.41M22 22H2M8 6l4-4 4 4M16 18a4 4 0 0 0-8 0"/>',
+  sunset: '<path d="M12 10V2M4.93 10.93l1.41 1.41M2 18h2M20 18h2M19.07 10.93l-1.41 1.41M22 22H2M16 6l-4 4-4-4M16 18a4 4 0 0 0-8 0"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  work: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/>',
+  thermo: '<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
+  drop: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7Z"/>',
+  snow: '<path d="M2 12h20M12 2v20M5 5l14 14M19 5 5 19"/>',
+  humid: '<path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05Z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>',
+  shirt: '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23Z"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+};
+const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+
 // ---------- Darstellung ----------
+const wdFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short' });
 const shortDayFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short', day: 'numeric', month: 'numeric' });
 const timeFmt = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-digit' });
 const hr = (t) => String(new Date(t).getHours());
-const VERDICT = { ok: ['✅', 'Fahren'], warn: ['⚠️', 'Aufpassen'], stop: ['🚫', 'Nicht fahren'] };
+const VERDICT = { ok: 'Fahren', warn: 'Aufpassen', stop: 'Nicht fahren' };
 const esc = (x) => String(x).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 const deg = (x) => (isNum(x) ? `${fmt0(x)}°` : '–');
+const pct = (x) => (isNum(x) ? `${fmt0(x)} %` : '–');
 const dayLabel = (i, d) => (i === 0 ? 'Heute' : i === 1 ? 'Morgen' : i === -1 ? 'Gestern' : shortDayFmt.format(d));
+const pill = (v) => `<span class="pill ${v}">${icon(v)}${VERDICT[v]}</span>`;
 const worstOf = (rides) => {
   const v = rides.map((r) => r.a?.verdict).filter(Boolean);
   return v.includes('stop') ? 'stop' : v.includes('warn') ? 'warn' : v.length ? 'ok' : null;
 };
+// "Handschuhe, Kappe + Regenjacke" → Chips
+function chips(text) {
+  const [base, ...extra] = String(text).split(' + ');
+  return `<div class="chips">${base.split(',').map((x) => x.trim()).filter(Boolean).map((x) => `<span class="chip">${esc(x)}</span>`).join('')}` +
+    `${extra.map((x) => `<span class="chip extra">+ ${esc(x)}</span>`).join('')}</div>`;
+}
 
 function renderNext(items) {
   const el = $('next');
@@ -133,19 +166,23 @@ function renderNext(items) {
   const a = r.a;
   el.className = `card next ${a.verdict}`;
   el.hidden = false;
+  const sub = a.reasons.length ? a.reasons.join(' · ') : 'Keine Wetterprobleme';
   el.innerHTML = `
-    <div class="when">Nächste Fahrt · ${dayLabel(it.i, it.d)} · ${r.name} ${hr(r.from)}–${hr(r.to)} Uhr${a.trend ? ' <span class="trend">Trend</span>' : ''}</div>
-    <div class="verdict">${VERDICT[a.verdict][0]} ${VERDICT[a.verdict][1]}</div>
-    ${a.reasons.length ? `<div class="why">${esc(a.reasons.join(' · '))}</div>` : ''}
-    <div class="kv">
-      <div><div class="label">Gefühlt</div><div class="val">${deg(r.h.feel)}</div></div>
-      <div><div class="label">Luft</div><div class="val">${deg(r.h.temp)}</div></div>
-      <div><div class="label">Regen</div><div class="val">${fmt0(r.h.prob)} %</div></div>
-      <div><div class="label">Schnee</div><div class="val">${fmt0(a.pSnow)} %</div></div>
-      <div><div class="label">Feuchte</div><div class="val">${fmt0(r.h.rh)} %</div></div>
+    <div class="head"><span class="overline">Nächste Fahrt</span>${a.trend ? '<span class="tag">Trend</span>' : ''}</div>
+    <div class="status-line">
+      <div class="status-icon ${a.verdict}">${icon(a.verdict)}</div>
+      <div class="status-text"><b>${VERDICT[a.verdict]}</b><span>${dayLabel(it.i, it.d)} · ${r.name} ${hr(r.from)}–${hr(r.to)} Uhr · ${esc(sub)}</span></div>
     </div>
-    <div class="label">Anziehen</div>
-    <div class="clothes">${esc(a.clothes)}</div>`;
+    <div class="metrics num">
+      <div class="metric"><div class="v">${deg(r.h.feel)}</div><div class="l">${icon('bike')}Gefühlt</div></div>
+      <div class="metric"><div class="v">${deg(r.h.temp)}</div><div class="l">${icon('thermo')}Luft</div></div>
+      <div class="metric"><div class="v">${pct(r.h.rh)}</div><div class="l">${icon('humid')}Feuchte</div></div>
+      <div class="metric"><div class="v">${pct(r.h.prob)}</div><div class="l">${icon('drop')}Regen</div></div>
+      <div class="metric"><div class="v">${pct(a.pHeavy)}</div><div class="l">${icon('drop')}Viel Regen</div></div>
+      <div class="metric"><div class="v">${pct(a.pSnow)}</div><div class="l">${icon('snow')}Schnee</div></div>
+    </div>
+    <div class="overline">Kleidung</div>
+    ${chips(a.clothes)}`;
 }
 
 function renderSummary(items, s) {
@@ -153,45 +190,44 @@ function renderSummary(items, s) {
   for (const it of items) {
     if (it.free || !it.rides.length) continue;
     if (it.rides.some((r) => !r.a)) { notes.none++; if (!it.rides.some((r) => r.a)) continue; }
-    const who = `Bei der ${shiftOrdinal(it.d, s)} (${dayLabel(it.i, it.d).replace(/^(Heute|Morgen)$/, (m) => m.toLowerCase())})`;
+    const who = `${dayLabel(it.i, it.d)} · ${shiftOrdinal(it.d, s).startsWith('zweiten') ? '2.' : '1.'} ${it.sh.name}schicht`;
     const where = (pred) => {
       const n = it.rides.filter((r) => r.a && pred(r.a)).map((r) => r.name);
-      return n.length === 2 ? 'am Hin- und Heimweg' : `am ${n[0]}`;
+      return n.length === 2 ? 'Hin- und Heimweg' : n[0];
     };
     const unsure = it.rides.some((r) => r.a?.trend) ? ' (noch unsicher)' : '';
     const bad = (k) => it.rides.some((r) => r.a && k(r.a));
-    if (bad((a) => a.pSnow >= 50)) notes.stop.push(`${who} ist ${where((a) => a.pSnow >= 50)} mit Schneefahrbahn zu rechnen – mit dem Rad wird's nichts${unsure}.`);
-    else if (bad((a) => a.pHeavy >= 50)) notes.stop.push(`${who} ist ${where((a) => a.pHeavy >= 50)} mit viel Regen zu rechnen – besser nicht mit dem Rad${unsure}.`);
-    // Warnungen einer Schicht in einem Satz, nach Fahrt gruppiert
+    if (bad((a) => a.pSnow >= 50)) notes.stop.push([who, `${where((a) => a.pSnow >= 50)}: Schneefahrbahn – mit dem Rad wird's nichts${unsure}.`]);
+    else if (bad((a) => a.pHeavy >= 50)) notes.stop.push([who, `${where((a) => a.pHeavy >= 50)}: viel Regen – besser nicht mit dem Rad${unsure}.`]);
     const stopped = bad((a) => a.pSnow >= 50) || bad((a) => a.pHeavy >= 50);
     const issues = (a) => [
       !stopped && a.pSnow >= 25 ? 'evtl. Schnee auf der Fahrbahn' : null,
       !stopped && a.pHeavy >= 25 ? 'evtl. stärkerer Regen' : null,
-      a.ice ? (a.iceText.startsWith('Reif') ? 'Reifglätte' : 'Glätte durch Nässe') : null,
+      a.ice ? (a.iceText.startsWith('Reif') ? 'Reifglätte möglich' : 'Glätte durch Nässe') : null,
       a.storm ? 'Sturmböen' : null,
     ].filter(Boolean).join(' und ');
     const per = it.rides.filter((r) => r.a && issues(r.a)).map((r) => [r.name, issues(r.a)]);
-    let w = per.map(([n, t]) => `am ${n} ${t}`);
-    if (per.length === 2 && per[0][1] === per[1][1]) w = [`am Hin- und Heimweg ${per[0][1]}`];
-    if (w.length) notes.warn.push(`${who}: ${w.join(', ')}${unsure}.`);
+    let w = per.map(([n, t]) => `${n}: ${t}`);
+    if (per.length === 2 && per[0][1] === per[1][1]) w = [`Hin- und Heimweg: ${per[0][1]}`];
+    if (w.length) notes.warn.push([who, `${w.join(' · ')}${unsure}.`]);
   }
-  const lines = [];
-  if (!notes.stop.length) {
-    lines.push(`<p class="sum ok">✅ <b>Fahrten im ganzen Schichtrad möglich</b>${notes.warn.length ? ' – an einzelnen Tagen aufpassen:' : ' – kein Schnee und kein Starkregen in Sicht.'}</p>`);
-  }
-  notes.stop.forEach((t) => lines.push(`<p class="sum stop">🚫 ${t}</p>`));
-  notes.warn.forEach((t) => lines.push(`<p class="sum warn">⚠️ ${t}</p>`));
-  if (notes.none) lines.push(`<p class="sum muted">Für ${notes.none === 1 ? 'eine Schicht' : notes.none + ' Schichten'} gibt es noch keine Vorhersage.</p>`);
-  $('shiftSummary').innerHTML = lines.join('');
+  const head = notes.stop.length
+    ? `<div class="verdict-line stop">${icon('stop')}<span>${notes.stop.length === 1 ? 'Eine Schicht' : notes.stop.length + ' Schichten'} besser nicht mit dem Rad</span></div>`
+    : `<div class="verdict-line ok">${icon('ok')}<span>Fahrten im ganzen Schichtrad möglich${notes.warn.length ? '' : ' – kein Schnee und kein Starkregen in Sicht'}</span></div>`;
+  const li = (cls, [who, text]) => `<li class="${cls}"><span class="when">${esc(who)}</span> – ${esc(text)}</li>`;
+  const list = [...notes.stop.map((n) => li('stop', n)), ...notes.warn.map((n) => li('warn', n))];
+  if (notes.none) list.push(`<li class="info">Für ${notes.none === 1 ? 'eine Schicht' : notes.none + ' Schichten'} gibt es noch keine Vorhersage.</li>`);
+  $('shiftSummary').innerHTML = head + (list.length ? `<ul class="notes">${list.join('')}</ul>` : '');
 }
 
 function rideHtml(r) {
-  const lbl = `${r.name} ${hr(r.from)}–${hr(r.to)} Uhr`;
-  if (!r.a) return `<div class="ride none"><div class="ride-top"><span class="lbl">${lbl}</span></div>noch keine Vorhersage</div>`;
+  const name = `<span class="ride-name">${icon(r.name === 'Hinweg' ? 'work' : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
+  if (!r.a) return `<div class="ride none"><div class="ride-row">${name}</div><div class="ride-vals">noch keine Vorhersage</div></div>`;
   const a = r.a;
   return `<div class="ride ${a.verdict}">
-    <div class="ride-top"><span class="lbl">${lbl}</span><span class="v">${VERDICT[a.verdict][0]} ${VERDICT[a.verdict][1]}</span></div>
-    <div class="ride-info">gefühlt <b>${deg(r.h.feel)}</b> · Regen <b>${fmt0(r.h.prob)} %</b> · Feuchte <b>${fmt0(r.h.rh)} %</b>${a.pSnow >= 5 ? ` · Schnee <b>${fmt0(a.pSnow)} %</b>` : ''}${a.reasons.length ? ` · <span class="w">${esc(a.reasons.join(', '))}</span>` : ''}</div>
+    <div class="ride-row">${name}${pill(a.verdict)}</div>
+    <div class="ride-vals num"><span>gefühlt <b>${deg(r.h.feel)}</b></span><span>Regen <b>${pct(r.h.prob)}</b></span><span>Feuchte <b>${pct(r.h.rh)}</b></span>${a.pSnow >= 5 ? `<span>Schnee <b>${pct(a.pSnow)}</b></span>` : ''}</div>
+    ${a.reasons.length ? `<div class="ride-why">${esc(a.reasons.join(' · '))}</div>` : ''}
     <div class="ride-cloth">${esc(a.clothes)}</div></div>`;
 }
 
@@ -204,29 +240,35 @@ function renderShifts(items) {
       while (j + 1 < items.length && items[j + 1].free) j++;
       const n = j - k + 1;
       const range = n === 1 ? shortDayFmt.format(it.d) : `${shortDayFmt.format(it.d)} – ${shortDayFmt.format(items[j].d)}`;
-      html.push(`<div class="free"><span class="circ c-green">🏖️</span><div><b style="color:var(--text)">${n === 1 ? 'Frei' : `${n} Tage frei`}</b><br>${range}</div></div>`);
+      html.push(`<div class="free"><div class="ic">${icon('calendar')}</div><div><b>${n === 1 ? 'Frei' : `${n} Tage frei`}</b> · ${range}</div></div>`);
       k = j;
       continue;
     }
-    const worst = worstOf(it.rides);
     const trend = it.rides.some((r) => r.a?.trend);
     html.push(`<div class="shift">
-      <div class="sh-head"><span class="circ ${it.sh.color}">${it.sh.icon}</span>
-        <div><div class="title">${dayLabel(it.i, it.d)}${trend ? '<span class="trend" title="Langfrist-Trend, noch unsicher">Trend</span>' : ''}</div>
-        <div class="sub">${it.sh.name}schicht ${it.sh.s}–${(it.sh.s + it.sh.len) % 24} Uhr</div></div>
-        ${worst ? `<span class="v">${VERDICT[worst][0]}</span>` : ''}</div>
-      ${it.rides.map(rideHtml).join('')}</div>`);
+      <div class="date${it.i === 0 ? ' today' : ''}"><div class="wd">${it.i === 0 ? 'Heute' : wdFmt.format(it.d)}</div><div class="d">${it.d.getDate()}</div></div>
+      <div>
+        <div class="shift-title"><span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span>${it.sh.name}schicht <small>${it.sh.s}–${(it.sh.s + it.sh.len) % 24} Uhr</small></span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
+        ${it.rides.map(rideHtml).join('')}
+      </div></div>`);
   }
   $('shifts').innerHTML = html.join('');
 }
 
 function setStatus(parts) { $('status').innerHTML = parts.filter(Boolean).join('<br>'); }
 
+// Kopf-Symbole
+$('logo').innerHTML = icon('bike');
+$('btnReload').innerHTML = icon('refresh');
+$('btnSettings').innerHTML = icon('sliders');
+$('howSummary').insertAdjacentHTML('afterbegin', icon('info'));
+
 // ---------- Hauptablauf ----------
 let busy = false;
 async function run() {
   if (busy) return;
   busy = true;
+  $('btnReload').classList.add('spin');
   const s = settings();
   const p = prefs(s);
   try {
@@ -241,7 +283,7 @@ async function run() {
     if (!hours.length) throw new Error('Keine Vorhersagedaten für diesen Ort.');
 
     const h0 = hours[0];
-    $('place').textContent = `📍 ${s.placeName || (pos.fixed ? 'Fester Standort' : 'GPS-Standort')}` +
+    $('place').innerHTML = `${icon('pin')}${esc(s.placeName || (pos.fixed ? 'Fester Standort' : 'GPS-Standort'))}` +
       (isNum(h0?.temp) ? ` · jetzt ${deg(h0.temp)}, gefühlt ${deg(h0.feel)}` : '') + (pos.stale ? ' · letzter Standort' : '');
 
     const items = planShifts(hours, { gs, om, ecm }, s, p);
@@ -261,6 +303,7 @@ async function run() {
   } catch (e) {
     setStatus([`<span class="err">${esc(e.message)}</span>`]);
   } finally {
+    $('btnReload').classList.remove('spin');
     busy = false;
   }
 }

@@ -6,145 +6,183 @@
 <title>Schichtradlwetter</title>
 <meta name="apple-mobile-web-app-title" content="Schichtradl">
 <meta name="application-name" content="Schichtradl">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0b0d10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
-/* Dunkles Fitness-App-Design: schwarzer Grund, dunkle Kacheln, große Zahlen, farbige Symbol-Kreise. */
 :root {
-  --bg: #000; --card: #1c1c1e; --card2: #2c2c2e; --line: #38383a;
-  --text: #fff; --muted: #8e8e93; --dim: #636366;
-  --blue: #1a9cf0; --cyan: #32c5ff; --green: #34c759; --amber: #ffb020; --red: #ff453a;
-  --orange: #ff8a1f; --purple: #a074ff; --night: #4f7cff;
+  --bg: #0b0d10; --surface: #15181d; --surface2: #1d2128; --border: #262b33;
+  --text: #eceef1; --muted: #9aa2ad; --dim: #6b7380;
+  --accent: #3b82f6;
+  --ok: #22c55e; --warn: #f59e0b; --stop: #ef4444;
+  --early: #f59e0b; --late: #a78bfa; --night: #60a5fa; --free: #6b7380;
+  --radius: 16px;
   color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f5f7; --surface: #ffffff; --surface2: #f0f2f5; --border: #e3e6eb;
+    --text: #12151a; --muted: #5f6773; --dim: #8a929e;
+    --accent: #2563eb; --ok: #16a34a; --warn: #d97706; --stop: #dc2626;
+    --early: #d97706; --late: #7c3aed; --night: #2563eb; --free: #8a929e;
+    color-scheme: light;
+  }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Segoe UI", sans-serif; }
-main { max-width: 640px; margin: 0 auto; padding: max(10px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", Roboto, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; }
+main { max-width: 600px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom)); }
+svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+.num { font-variant-numeric: tabular-nums; }
 
 /* Kopf */
-header { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 14px; }
-header h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.3px; }
-#place { color: var(--muted); font-size: 13px; }
-.iconbtn { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--card); color: var(--text); font-size: 17px; cursor: pointer; }
+header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
+.logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8); flex: none; }
+.logo svg.i { width: 22px; height: 22px; }
+.brand { flex: 1; min-width: 0; }
+.brand h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+.brand .loc { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand .loc svg.i { width: 14px; height: 14px; }
+.ghost { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+  display: grid; place-items: center; cursor: pointer; }
+.ghost:active { transform: scale(.96); }
+.spin svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* Kacheln */
-.card { background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
-.card-title { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 600; margin: 0 0 10px; }
-.card-title .sub { font-size: 12px; font-weight: 400; color: var(--muted); }
-.label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.muted { color: var(--muted); }
-.unit { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+/* Karten */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+.overline { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.section-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
 
-.status { font-size: 12px; color: var(--dim); margin: 4px 2px 10px; }
-.status .err { color: var(--red); }
-.status .warn { color: var(--amber); }
+/* Status */
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 9px 3px 7px; border-radius: 999px; white-space: nowrap; }
+.pill svg.i { width: 14px; height: 14px; vertical-align: 0; }
+.pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.pill.stop { color: var(--stop); background: color-mix(in srgb, var(--stop) 15%, transparent); }
+.tag { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
 
-/* Kleidung als Text */
-.krow { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-.krow:first-child { border-top: 0; }
-.krow b { font-weight: 700; }
-.krow.warn { color: var(--amber); font-weight: 600; }
-
-/* Schichten */
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
-.chip { background: var(--card2); border-radius: 999px; padding: 5px 11px; font-size: 13px; }
-.chip.ok { color: var(--green); }
-.shift { padding: 12px 0 4px; border-top: 1px solid var(--line); }
-.shift:first-child { border-top: 0; }
-.sh-head { display: flex; align-items: center; gap: 12px; }
-.sh-head .title { font-weight: 600; }
-.sh-head .sub { font-size: 13px; color: var(--muted); }
-.sh-head .v { margin-left: auto; font-size: 20px; }
-.trend { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; }
-.ride { margin: 8px 0 4px 52px; padding: 8px 10px; background: var(--card2); border-radius: 10px; border-left: 3px solid var(--green); }
-.ride.warn { border-left-color: var(--amber); }
-.ride.stop { border-left-color: var(--red); }
-.ride-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 3px; font-variant-numeric: tabular-nums; }
-.ride-top .lbl { color: var(--muted); font-size: 13px; min-width: 52px; }
-.ride-info { font-size: 14px; }
-.ride-info .w { color: var(--amber); }
-.ride-cloth { font-size: 13px; color: var(--muted); margin-top: 3px; }
-.ride-top .v { font-size: 13px; font-weight: 600; }
-.ride.ok .v { color: var(--green); } .ride.warn .v { color: var(--amber); } .ride.stop .v { color: var(--red); }
-.sum { margin: 6px 0; font-size: 15px; line-height: 1.4; }
-.sum.ok b { color: var(--green); }
-.sum.stop { color: var(--red); }
-.sum.warn { color: var(--amber); }
-.ride-top .v { margin-left: auto; }
-.ride.none { border-left-color: var(--line); color: var(--muted); font-size: 13px; }
-.free { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
-
-/* Einstellungen */
-dialog { border: 0; border-radius: 16px; background: var(--card); color: var(--text); width: min(520px, calc(100% - 32px)); padding: 18px; }
-dialog::backdrop { background: rgba(0,0,0,.6); }
-dialog h2 { margin: 0 0 6px; font-size: 18px; }
-label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 5px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
-input { width: 100%; font: inherit; color: var(--text); background: var(--card2); border: 0; border-radius: 10px; padding: 10px 12px; }
-.row { display: flex; gap: 8px; }
-.row > * { flex: 1; }
-.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-.btn { font: inherit; border: 0; border-radius: 999px; padding: 9px 18px; background: var(--card2); color: var(--text); cursor: pointer; }
-.btn.primary { background: var(--blue); }
-details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
-details p, details li { font-size: 13px; color: var(--muted); }
-.tap-text { cursor: pointer; }
-.hint { font-size: 11px; color: var(--dim); margin-top: 8px; }
-
-.circ { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; background: var(--card2); flex: none; }
-.c-green { background: color-mix(in srgb, var(--green) 25%, transparent); }
-.c-orange { background: color-mix(in srgb, var(--orange) 25%, transparent); }
-.c-purple { background: color-mix(in srgb, var(--purple) 25%, transparent); }
-.c-night { background: color-mix(in srgb, var(--night) 28%, transparent); }
 /* Nächste Fahrt */
-.next { border-left: 4px solid var(--green); }
-.next.warn { border-left-color: var(--amber); }
-.next.stop { border-left-color: var(--red); }
-.next .when { color: var(--muted); font-size: 14px; }
-.next .verdict { font-size: 26px; font-weight: 700; margin: 4px 0 8px; }
-.next.ok .verdict { color: var(--green); } .next.warn .verdict { color: var(--amber); } .next.stop .verdict { color: var(--red); }
-.next .why { color: var(--amber); font-weight: 600; margin-bottom: 8px; }
-.next.stop .why { color: var(--red); }
-.kv { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 10px; }
-.kv .val { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.next .clothes { font-size: 17px; font-weight: 600; line-height: 1.35; }
-.ride-info .w { color: var(--amber); }
-.ride.stop .ride-info .w { color: var(--red); }
-.ride-cloth { font-size: 14px; color: var(--text); margin-top: 3px; }
+.next { position: relative; overflow: hidden; }
+.next::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--ok); }
+.next.warn::before { background: var(--warn); } .next.stop::before { background: var(--stop); }
+.next .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.status-line { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; }
+.status-icon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; flex: none; }
+.status-icon svg.i { width: 26px; height: 26px; }
+.status-icon.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.status-icon.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.status-icon.stop { color: var(--stop); background: color-mix(in srgb, var(--stop) 15%, transparent); }
+.status-text b { display: block; font-size: 24px; font-weight: 700; letter-spacing: -.3px; line-height: 1.15; }
+.status-text span { font-size: 13px; color: var(--muted); }
+.next.warn .status-text span { color: var(--warn); } .next.stop .status-text span { color: var(--stop); }
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden; margin: 14px 0; }
+.metric { background: var(--surface); padding: 10px 12px; }
+.metric .v { font-size: 20px; font-weight: 700; }
+.metric .l { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.metric .l svg.i { width: 13px; height: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { font-size: 13px; font-weight: 500; padding: 5px 10px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); }
+.chip.extra { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+
+/* Zusammenfassung */
+.verdict-line { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
+.verdict-line svg.i { width: 20px; height: 20px; margin-top: 1px; }
+.verdict-line.ok { color: var(--ok); } .verdict-line.stop { color: var(--stop); }
+.notes { list-style: none; margin: 10px 0 0; padding: 0; }
+.notes li { position: relative; padding: 8px 0 8px 18px; border-top: 1px solid var(--border); font-size: 14px; }
+.notes li::before { content: ""; position: absolute; left: 2px; top: 15px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.notes li.stop::before { background: var(--stop); }
+.notes li.info::before { background: var(--dim); }
+.notes .when { font-weight: 600; }
+
+/* Schichtliste */
+.shift { display: grid; grid-template-columns: 46px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.shift:first-child { border-top: 0; padding-top: 2px; }
+.date { text-align: center; }
+.date .wd { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+.date .d { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.date.today .d { color: var(--accent); }
+.shift-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
+.badge .dot { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; }
+.badge .dot svg.i { width: 15px; height: 15px; }
+.early .dot { color: var(--early); background: color-mix(in srgb, var(--early) 15%, transparent); }
+.late .dot { color: var(--late); background: color-mix(in srgb, var(--late) 16%, transparent); }
+.night .dot { color: var(--night); background: color-mix(in srgb, var(--night) 16%, transparent); }
+.badge small { font-weight: 500; color: var(--muted); font-size: 13px; }
+.ride { padding: 8px 0; border-top: 1px dashed var(--border); }
+.ride:first-of-type { border-top: 0; }
+.ride-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ride-name { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); min-width: 118px; }
+.ride-name svg.i { width: 15px; height: 15px; }
+.ride-vals { font-size: 13px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.ride-vals b { color: var(--text); font-weight: 600; }
+.ride-why { font-size: 13px; margin-top: 4px; }
+.ride.warn .ride-why { color: var(--warn); } .ride.stop .ride-why { color: var(--stop); }
+.ride-cloth { font-size: 13px; margin-top: 4px; }
+.ride.none .ride-vals { font-style: italic; }
+.free { display: grid; grid-template-columns: 46px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); color: var(--muted); align-items: center; }
+.free .ic { display: grid; place-items: center; }
+.free b { color: var(--text); font-weight: 600; }
+
+.status { font-size: 12px; color: var(--dim); text-align: center; margin: 14px 0; }
+.status .err { color: var(--stop); }
+.status .warn { color: var(--warn); }
+details summary { cursor: pointer; color: var(--muted); font-size: 14px; list-style: none; display: flex; align-items: center; gap: 6px; }
+details summary::-webkit-details-marker { display: none; }
+details p { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+
 /* Einstellungen */
-.lvl { display: flex; gap: 8px; align-items: center; margin: 10px 0 6px; }
-.lvl span { font-size: 13px; color: var(--muted); }
-.lvl input { width: 64px; flex: none; padding: 7px 10px; }
-.lvltext { margin-bottom: 4px; }
-.small-hint { font-size: 12px; color: var(--dim); margin-top: 4px; }
-dialog { max-height: 90vh; overflow-y: auto; }
+dialog { border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text);
+  width: min(520px, calc(100% - 24px)); max-height: 90vh; overflow-y: auto; padding: 20px; }
+dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(3px); }
+dialog h2 { margin: 0 0 4px; font-size: 18px; }
+fieldset { border: 0; padding: 0; margin: 18px 0 0; }
+legend { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 8px; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input { width: 100%; font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; }
+input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 0; }
+.lvl { display: flex; gap: 8px; align-items: center; margin: 12px 0 6px; font-size: 13px; color: var(--muted); }
+.lvl input { width: 64px; flex: none; padding: 6px 9px; }
+.row { display: flex; gap: 8px; } .row > * { flex: 1; }
+.hint { font-size: 12px; color: var(--dim); margin-top: 4px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.btn { font: inherit; font-weight: 600; border: 1px solid var(--border); border-radius: 10px; padding: 9px 16px; background: var(--surface2); color: var(--text); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.btn.left { margin-right: auto; }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <div>
+    <div class="logo" id="logo"></div>
+    <div class="brand">
       <h1>Schichtradlwetter</h1>
-      <div id="place">Wörgl</div>
+      <div class="loc" id="place">Wörgl</div>
     </div>
-    <div class="row" style="flex:none">
-      <button class="iconbtn" id="btnReload" aria-label="Aktualisieren">↻</button>
-      <button class="iconbtn" id="btnSettings" aria-label="Einstellungen">⚙︎</button>
-    </div>
+    <button class="ghost" id="btnReload" aria-label="Aktualisieren"></button>
+    <button class="ghost" id="btnSettings" aria-label="Einstellungen"></button>
   </header>
 
   <section class="card next" id="next" hidden></section>
 
   <section class="card">
-    <div class="card-title">Schichtrad</div>
-    <div id="shiftSummary">Lade Wetter …</div>
+    <div class="section-head"><h2>Schichtrad</h2><span class="overline">10 Tage</span></div>
+    <div id="shiftSummary"><span class="hint">Lade Wetter …</span></div>
   </section>
 
   <section class="card">
+    <div class="section-head"><h2>Fahrten</h2><span class="overline">Hin &amp; Heim</span></div>
     <div id="shifts"></div>
   </section>
 
@@ -152,12 +190,12 @@ dialog { max-height: 90vh; overflow-y: auto; }
 
   <section class="card">
     <details>
-      <summary>Wie wird gerechnet?</summary>
-      <p><b>Gefühlt</b> = Temperatur am Rad mit Wind + Fahrtwind (Einstellungen).</p>
-      <p><b>🚫 Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe <b>mehr Regen als deine Grenze</b> bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder <b>Schneefahrbahn</b> droht. <b>⚠️ Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
-      <p><b>Glätte</b> nur bei Feuchtigkeit: nasse Fahrbahn bei Frost (Regen jetzt oder in den 6 Stunden davor) oder Reif (Frost + Luftfeuchte ab 92 % bei klarem Himmel, Nebelreif ab 97 %). Trockene Kälte ist nicht glatt.</p>
+      <summary id="howSummary">Wie wird gerechnet?</summary>
+      <p><b>Gefühlt</b> = Temperatur am Rad mit Wind + Fahrtwind.</p>
+      <p><b>Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe mehr Regen als deine Grenze bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder Schneefahrbahn droht. <b>Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
+      <p><b>Glätte</b> nur bei Feuchtigkeit: nasse Fahrbahn bei Frost (Niederschlag jetzt oder in den 6 Stunden davor) oder Reif (Frost + Luftfeuchte ab 92 % bei klarem Himmel, Nebelreif ab 97 %).</p>
       <p><b>Schnee:</b> Hinweg = Neuschnee der 6 Stunden davor, Heimweg = Neuschnee während der ganzen Schicht.</p>
-      <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble und ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
+      <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble, ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
     </details>
   </section>
 </main>
@@ -165,40 +203,46 @@ dialog { max-height: 90vh; overflow-y: auto; }
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
     <h2>Einstellungen</h2>
+    <div class="hint">Werte gelten nur auf diesem Gerät.</div>
 
-    <label>Kleidung nach gefühlter Temperatur</label>
-    <div class="lvl"><span>unter</span><input id="l1" inputmode="decimal"><span>°C gefühlt</span></div>
-    <input id="l1t" class="lvltext">
-    <div class="lvl"><span>unter</span><input id="l2" inputmode="decimal"><span>°C gefühlt</span></div>
-    <input id="l2t" class="lvltext">
-    <div class="lvl"><span>unter</span><input id="l3" inputmode="decimal"><span>°C gefühlt</span></div>
-    <input id="l3t" class="lvltext">
-    <div class="lvl"><span>darüber</span></div>
-    <input id="l4t" class="lvltext">
+    <fieldset>
+      <legend>Kleidung nach gefühlter Temperatur</legend>
+      <div class="lvl">unter <input id="l1" inputmode="decimal"> °C</div>
+      <input id="l1t">
+      <div class="lvl">unter <input id="l2" inputmode="decimal"> °C</div>
+      <input id="l2t">
+      <div class="lvl">unter <input id="l3" inputmode="decimal"> °C</div>
+      <input id="l3t">
+      <div class="lvl">darüber</div>
+      <input id="l4t">
+    </fieldset>
 
-    <label for="heavyMm">Zu viel Regen ab (mm pro Stunde)</label>
-    <input id="heavyMm" inputmode="decimal">
-    <div class="small-hint">0,1 = Tröpfeln · 0,5 = leichter Regen · 2 = kräftiger Regen</div>
+    <fieldset>
+      <legend>Grenzen</legend>
+      <label for="heavyMm">Zu viel Regen ab (mm pro Stunde)</label>
+      <input id="heavyMm" inputmode="decimal">
+      <div class="hint">0,1 = Tröpfeln · 0,5 = leichter Regen · 2 = kräftiger Regen</div>
+      <label for="snowCm">Schneefahrbahn ab Neuschnee (cm)</label>
+      <input id="snowCm" inputmode="decimal">
+      <label for="rideKmh">Fahrtgeschwindigkeit für „gefühlt“ (km/h)</label>
+      <input id="rideKmh" inputmode="decimal">
+    </fieldset>
 
-    <label for="snowCm">Schneefahrbahn ab Neuschnee (cm)</label>
-    <input id="snowCm" inputmode="decimal">
-
-    <label for="rideKmh">Fahrtgeschwindigkeit für „gefühlt“ (km/h)</label>
-    <input id="rideKmh" inputmode="decimal">
-
-    <label for="cycleStart">Erster Frühdienst (6–14) des Schichtrads</label>
-    <input id="cycleStart" type="date">
-
-    <label>Standort (beide leer = GPS)</label>
-    <div class="row">
-      <input id="fixLat" inputmode="decimal" placeholder="Breite 47.489">
-      <input id="fixLon" inputmode="decimal" placeholder="Länge 12.062">
-    </div>
-    <label for="placeName">Name des Orts</label>
-    <input id="placeName" placeholder="Wörgl">
+    <fieldset>
+      <legend>Schicht &amp; Ort</legend>
+      <label for="cycleStart">Erster Frühdienst (6–14) des Schichtrads</label>
+      <input id="cycleStart" type="date">
+      <label>Standort (beide leer = GPS)</label>
+      <div class="row">
+        <input id="fixLat" inputmode="decimal" placeholder="Breite 47.489">
+        <input id="fixLon" inputmode="decimal" placeholder="Länge 12.062">
+      </div>
+      <label for="placeName">Name des Orts</label>
+      <input id="placeName" placeholder="Wörgl">
+    </fieldset>
 
     <div class="actions">
-      <button class="btn" type="button" id="btnDefaults">Standard</button>
+      <button class="btn left" type="button" id="btnDefaults">Standard</button>
       <button class="btn" value="cancel" formnovalidate>Abbrechen</button>
       <button class="btn primary" value="save">Speichern</button>
     </div>
