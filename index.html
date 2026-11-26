@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mein Wetter</title>
+<title>Radwetter</title>
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -22,7 +22,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--text);
   font: 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Segoe UI", sans-serif; }
-main { max-width: 640px; margin: 0 auto; padding: max(10px, env(safe-area-inset-top)) 16px calc(84px + env(safe-area-inset-bottom)); }
+main { max-width: 640px; margin: 0 auto; padding: max(10px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
 
 /* Kopf */
 header { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 14px; }
@@ -38,25 +38,6 @@ header h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.3px;
 .muted { color: var(--muted); }
 .unit { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 2px; }
 
-/* Heute: Hauptwert */
-.hero { display: flex; align-items: center; gap: 14px; }
-.hero .icon { font-size: 54px; line-height: 1; }
-.hero .temp { font-size: 56px; font-weight: 700; letter-spacing: -2px; line-height: 1; }
-.hero .desc { color: var(--muted); margin-top: 4px; }
-.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-.metric { background: var(--card); border-radius: 14px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; }
-.metric .circ { flex: none; }
-.metric .small { font-size: 11px; color: var(--muted); }
-.metric .val { font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.circ { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; background: var(--card2); }
-.c-blue { background: color-mix(in srgb, var(--blue) 25%, transparent); }
-.c-cyan { background: color-mix(in srgb, var(--cyan) 22%, transparent); }
-.c-green { background: color-mix(in srgb, var(--green) 25%, transparent); }
-.c-amber { background: color-mix(in srgb, var(--amber) 25%, transparent); }
-.c-red { background: color-mix(in srgb, var(--red) 28%, transparent); }
-.c-orange { background: color-mix(in srgb, var(--orange) 25%, transparent); }
-.c-purple { background: color-mix(in srgb, var(--purple) 25%, transparent); }
-.c-night { background: color-mix(in srgb, var(--night) 28%, transparent); }
 .status { font-size: 12px; color: var(--dim); margin: 4px 2px 10px; }
 .status .err { color: var(--red); }
 .status .warn { color: var(--amber); }
@@ -66,26 +47,6 @@ header h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.3px;
 .krow:first-child { border-top: 0; }
 .krow b { font-weight: 700; }
 .krow.warn { color: var(--amber); font-weight: 600; }
-
-/* Stündliche Leiste */
-.strip { display: flex; overflow-x: auto; gap: 2px; padding-bottom: 6px; scrollbar-width: none; }
-.strip::-webkit-scrollbar { display: none; }
-.hcol { flex: none; width: 52px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; border-radius: 10px; cursor: pointer; }
-.hcol.sel { background: var(--card2); }
-.hcol .t { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.hcol .i { font-size: 20px; }
-.hcol .tp { font-weight: 700; font-variant-numeric: tabular-nums; }
-.hcol .fl { font-size: 11px; color: var(--cyan); }
-.hcol .barbox { width: 14px; height: 60px; background: var(--card2); border-radius: 7px; display: flex; align-items: flex-end; overflow: hidden; }
-.hcol .barbox span { display: block; width: 100%; background: var(--blue); border-radius: 7px; }
-.hcol .pp { font-size: 11px; font-variant-numeric: tabular-nums; }
-.hcol.daystart { border-left: 1px solid var(--line); border-radius: 0 10px 10px 0; }
-.hdetail { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; min-height: 18px; }
-
-/* Nowcast */
-.nowcast { display: flex; align-items: flex-end; gap: 3px; height: 56px; }
-.nowcast div { flex: 1; background: var(--blue); border-radius: 3px 3px 0 0; min-height: 2px; }
-.nowcast-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; }
 
 /* Schichten */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
@@ -116,28 +77,6 @@ header h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.3px;
 .ride.none { border-left-color: var(--line); color: var(--muted); font-size: 13px; }
 .free { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
 
-/* Woche */
-.dayrow { display: grid; grid-template-columns: 44px 30px 52px 1fr; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
-.dayrow:first-child { border-top: 0; }
-.dayrow .n { font-weight: 600; }
-.dayrow .i { font-size: 22px; text-align: center; }
-.dayrow .p { color: var(--cyan); font-size: 13px; font-variant-numeric: tabular-nums; }
-.range { display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; font-size: 14px; }
-.range .lo { color: var(--muted); text-align: right; }
-.range .track { position: relative; height: 6px; background: var(--card2); border-radius: 3px; }
-.range .track span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--blue), var(--amber)); }
-.dayrow .fl { grid-column: 3 / 5; font-size: 11px; color: var(--cyan); margin-top: -6px; }
-.dayrow.lr { opacity: .75; }
-
-/* Tab-Leiste */
-nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; background: rgba(18,18,20,.92);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
-nav.tabs button { flex: 1; max-width: 200px; background: none; border: 0; color: var(--dim); padding: 8px 0 10px; font: inherit; font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-nav.tabs button b { font-size: 21px; font-weight: 400; filter: grayscale(1) brightness(.7); }
-nav.tabs button.on { color: var(--blue); }
-nav.tabs button.on b { filter: none; }
-[data-view][hidden] { display: none; }
-
 /* Einstellungen */
 dialog { border: 0; border-radius: 16px; background: var(--card); color: var(--text); width: min(520px, calc(100% - 32px)); padding: 18px; }
 dialog::backdrop { background: rgba(0,0,0,.6); }
@@ -153,13 +92,41 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 details p, details li { font-size: 13px; color: var(--muted); }
 .tap-text { cursor: pointer; }
 .hint { font-size: 11px; color: var(--dim); margin-top: 8px; }
+
+.circ { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; background: var(--card2); flex: none; }
+.c-green { background: color-mix(in srgb, var(--green) 25%, transparent); }
+.c-orange { background: color-mix(in srgb, var(--orange) 25%, transparent); }
+.c-purple { background: color-mix(in srgb, var(--purple) 25%, transparent); }
+.c-night { background: color-mix(in srgb, var(--night) 28%, transparent); }
+/* Nächste Fahrt */
+.next { border-left: 4px solid var(--green); }
+.next.warn { border-left-color: var(--amber); }
+.next.stop { border-left-color: var(--red); }
+.next .when { color: var(--muted); font-size: 14px; }
+.next .verdict { font-size: 26px; font-weight: 700; margin: 4px 0 8px; }
+.next.ok .verdict { color: var(--green); } .next.warn .verdict { color: var(--amber); } .next.stop .verdict { color: var(--red); }
+.next .why { color: var(--amber); font-weight: 600; margin-bottom: 8px; }
+.next.stop .why { color: var(--red); }
+.kv { display: flex; gap: 22px; margin-bottom: 10px; }
+.kv .val { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.next .clothes { font-size: 17px; font-weight: 600; line-height: 1.35; }
+.ride-info .w { color: var(--amber); }
+.ride.stop .ride-info .w { color: var(--red); }
+.ride-cloth { font-size: 14px; color: var(--text); margin-top: 3px; }
+/* Einstellungen */
+.lvl { display: flex; gap: 8px; align-items: center; margin: 10px 0 6px; }
+.lvl span { font-size: 13px; color: var(--muted); }
+.lvl input { width: 64px; flex: none; padding: 7px 10px; }
+.lvltext { margin-bottom: 4px; }
+.small-hint { font-size: 12px; color: var(--dim); margin-top: 4px; }
+dialog { max-height: 90vh; overflow-y: auto; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <div>
-      <h1 id="viewTitle">Heute</h1>
+      <h1>Radwetter</h1>
       <div id="place">Wörgl</div>
     </div>
     <div class="row" style="flex:none">
@@ -168,93 +135,57 @@ details p, details li { font-size: 13px; color: var(--muted); }
     </div>
   </header>
 
-  <!-- ===== HEUTE ===== -->
-  <div data-view="heute">
-    <section class="card">
-      <div class="hero">
-        <div class="icon" id="nowIcon">·</div>
-        <div>
-          <div class="temp"><span id="nowTemp">–</span></div>
-          <div class="desc" id="nowDesc">Lade Daten …</div>
-        </div>
-      </div>
-    </section>
+  <section class="card next" id="next" hidden></section>
 
-    <div class="metrics">
-      <div class="metric"><div class="circ c-cyan">🚲</div><div><div class="label">Am Rad</div><div class="val" id="mFeel">–</div></div></div>
-      <div class="metric"><div class="circ c-blue">💧</div><div><div class="label">Regen 1 h</div><div class="val" id="mProb">–</div></div></div>
-      <div class="metric"><div class="circ c-purple">☔</div><div><div class="label">Regen 6 h</div><div class="val" id="mProb6">–</div></div></div>
-      <div class="metric"><div class="circ c-green">💨</div><div><div class="label">Wind</div><div class="val" id="mWind">–</div></div></div>
-    </div>
-    <div class="status" id="status"></div>
+  <section class="card">
+    <div class="card-title">Schichtrad</div>
+    <div id="shiftSummary">Lade Wetter …</div>
+  </section>
 
-    <section class="card" id="clothCard" hidden>
-      <div class="card-title">Radkleidung nächste 12 h <span class="sub" id="clothSummary"></span></div>
-      <div id="clothList"></div>
-    </section>
+  <section class="card">
+    <div id="shifts"></div>
+  </section>
 
-    <section class="card">
-      <div class="card-title">Stündlich <span class="sub">antippen für Quellen</span></div>
-      <div class="strip" id="hours"></div>
-      <div class="hdetail" id="hourDetail"></div>
-    </section>
+  <div class="status" id="status"></div>
 
-    <section class="card" id="nowcastCard" hidden>
-      <div class="card-title">Radar nächste 3 h <span class="sub" id="nowcastSub"></span></div>
-      <div class="nowcast" id="nowcast"></div>
-      <div class="nowcast-labels" id="nowcastLabels"></div>
-    </section>
-  </div>
-
-  <!-- ===== SCHICHTEN ===== -->
-  <div data-view="schichten" hidden>
-    <section class="card">
-      <div class="card-title">Schichtrad</div>
-      <div id="shiftSummary"></div>
-    </section>
-    <section class="card">
-      <div id="shifts"></div>
-      <div class="hint">✅ fahren · ⚠️ aufpassen · 🚫 nicht fahren (zu viel Regen) · gefühlt = Temperatur am Rad mit Fahrtwind</div>
-    </section>
-  </div>
-
-  <!-- ===== WOCHE ===== -->
-  <div data-view="woche" hidden>
-    <section class="card">
-      <div class="card-title">7 Tage <span class="sub">≈ = Trend</span></div>
-      <div id="days"></div>
-    </section>
-    <section class="card">
-      <details>
-        <summary>Wie wird gerechnet?</summary>
-        <p>Regenwahrscheinlichkeit = Chance auf mindestens <b>0,1 mm</b> in der Stunde an deinem Ort.</p>
-        <ul>
-          <li><b>GeoSphere-Ensemble</b> (1 km): aus 10./50./90. Perzentil geschätzt. Gewicht 40 %.</li>
-          <li><b>DWD ICON-D2-Ensemble</b> (20 Läufe, 2 km, Open-Meteo): Läufe mit Regen ausgezählt. Gewicht 40 %.</li>
-          <li><b>GeoSphere-Hauptlauf</b> (1 km): Menge → weicher Ja/Nein-Wert. Gewicht 20 %.</li>
-          <li><b>GeoSphere-Radar-Hochrechnung</b>: dominiert die ersten 3 Stunden.</li>
-          <li><b>ECMWF-Ensemble</b> (51 Läufe, Open-Meteo): ab etwa Tag 3, als „≈ Trend“ markiert.</li>
-        </ul>
-        <p><b>Gefühlt am Rad</b>: Windchill mit Wind + 20 km/h Fahrtwind. Handschuhe + Kappe unter 10 °C gefühlt, dicke Jacke und Hose unter 5 °C gefühlt.</p>
-        <p><b>🚫 Nicht fahren</b>: mindestens die Hälfte der Läufe bringt mehr Regen als deine Grenze (⚙︎, Standard 2 mm/h). <b>⚠️ Aufpassen</b>: ab 25 % Starkregen, Glätte, Schnee oder Böen ab 60 km/h.</p>
-      </details>
-    </section>
-  </div>
+  <section class="card">
+    <details>
+      <summary>Wie wird gerechnet?</summary>
+      <p><b>Gefühlt</b> = Temperatur am Rad mit Wind + Fahrtwind (Einstellungen).</p>
+      <p><b>🚫 Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe <b>mehr Regen als deine Grenze</b> bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder <b>Schneefahrbahn</b> droht. <b>⚠️ Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
+      <p><b>Schnee:</b> Hinweg = Neuschnee der 6 Stunden davor, Heimweg = Neuschnee während der ganzen Schicht.</p>
+      <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble und ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
+    </details>
+  </section>
 </main>
-
-<nav class="tabs">
-  <button data-tab="heute" class="on"><b>☀️</b>Heute</button>
-  <button data-tab="schichten"><b>🚲</b>Schichten</button>
-  <button data-tab="woche"><b>📅</b>Woche</button>
-</nav>
 
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
     <h2>Einstellungen</h2>
+
+    <label>Kleidung nach gefühlter Temperatur</label>
+    <div class="lvl"><span>unter</span><input id="l1" inputmode="decimal"><span>°C gefühlt</span></div>
+    <input id="l1t" class="lvltext">
+    <div class="lvl"><span>unter</span><input id="l2" inputmode="decimal"><span>°C gefühlt</span></div>
+    <input id="l2t" class="lvltext">
+    <div class="lvl"><span>unter</span><input id="l3" inputmode="decimal"><span>°C gefühlt</span></div>
+    <input id="l3t" class="lvltext">
+    <div class="lvl"><span>darüber</span></div>
+    <input id="l4t" class="lvltext">
+
+    <label for="heavyMm">Zu viel Regen ab (mm pro Stunde)</label>
+    <input id="heavyMm" inputmode="decimal">
+    <div class="small-hint">0,1 = Tröpfeln · 0,5 = leichter Regen · 2 = kräftiger Regen</div>
+
+    <label for="snowCm">Schneefahrbahn ab Neuschnee (cm)</label>
+    <input id="snowCm" inputmode="decimal">
+
+    <label for="rideKmh">Fahrtgeschwindigkeit für „gefühlt“ (km/h)</label>
+    <input id="rideKmh" inputmode="decimal">
+
     <label for="cycleStart">Erster Frühdienst (6–14) des Schichtrads</label>
     <input id="cycleStart" type="date">
-    <label for="heavyMm">Nicht radeln ab Regen (mm pro Stunde)</label>
-    <input id="heavyMm" inputmode="decimal" placeholder="2">
+
     <label>Standort (beide leer = GPS)</label>
     <div class="row">
       <input id="fixLat" inputmode="decimal" placeholder="Breite 47.489">
@@ -262,7 +193,9 @@ details p, details li { font-size: 13px; color: var(--muted); }
     </div>
     <label for="placeName">Name des Orts</label>
     <input id="placeName" placeholder="Wörgl">
+
     <div class="actions">
+      <button class="btn" type="button" id="btnDefaults">Standard</button>
       <button class="btn" value="cancel" formnovalidate>Abbrechen</button>
       <button class="btn primary" value="save">Speichern</button>
     </div>

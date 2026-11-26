@@ -79,15 +79,16 @@ async function fetchGeoSphere(lat, lon) {
 //  - icon_d2_eps: DWD ICON-D2, 20 Läufe, 2 km, ~2 Tage
 //  - ecmwf_ifs025: ECMWF, 51 Läufe, 25 km, 12 Tage (für die Schichten weiter voraus)
 async function fetchEnsemble(model, days, ttlMs, lat, lon) {
-  const vars = ['precipitation', 'temperature_2m', 'cloud_cover', 'wind_speed_10m', 'wind_gusts_10m'];
+  const vars = ['precipitation', 'snowfall', 'temperature_2m', 'cloud_cover', 'wind_speed_10m', 'wind_gusts_10m'];
   const url = `${OM}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=${vars.join(',')}` +
     `&models=${model}&forecast_days=${days}&timezone=GMT&wind_speed_unit=ms`;
   try {
-    const json = await cachedJson(`om-${model}-${lat.toFixed(3)},${lon.toFixed(3)}`, ttlMs, url);
+    const json = await cachedJson(`om2-${model}-${lat.toFixed(3)},${lon.toFixed(3)}`, ttlMs, url);
     if (json.error) throw new Error(json.reason || 'Fehler');
     const h = json.hourly || {};
     const members = (name) => Object.keys(h).filter((k) => k === name || k.startsWith(name + '_member'));
     const pk = members('precipitation');
+    const sk = members('snowfall');
     const times = h.time || [];
     const rows = new Map();
     times.forEach((t, i) => {
@@ -98,6 +99,7 @@ async function fetchEnsemble(model, days, ttlMs, lat, lon) {
       const at = (name) => avg(members(name).map((k) => h[k][i]));
       rows.set(Date.parse(t + 'Z'), {
         prec, prec3, n: prec.length, mm: prec[Math.floor(prec.length / 2)],
+        snowM: sk.map((k) => h[k][i]),        // Neuschnee in cm je Lauf (Reihenfolge = Lauf)
         temp: at('temperature_2m'), cloud: at('cloud_cover'), wind: at('wind_speed_10m'), gust: at('wind_gusts_10m'),
       });
     });
@@ -238,7 +240,7 @@ function buildHours(pos, gs, om, ecm, opts = {}) {
       };
     } else continue;
 
-    h.feel = rideFeel(h.temp, h.wind);
+    h.feel = rideFeel(h.temp, h.wind, opts.rideKmh);
     [h.icon, h.desc] = symbol(h);
     if ([h.prob, h.temp, h.cloud].some(isNum)) hours.push(h);
   }
@@ -249,54 +251,78 @@ function buildHours(pos, gs, om, ecm, opts = {}) {
 const RIDE_KMH = 20;   // Fahrtwind: Eigengeschwindigkeit, die zum Wind dazukommt
 
 // Gefühlte Temperatur auf dem Rad (Windchill-Formel mit Wind + Fahrtwind; über 10 °C gilt die Lufttemperatur).
-function rideFeel(temp, windMs) {
+function rideFeel(temp, windMs, rideKmh = RIDE_KMH) {
   if (!isNum(temp)) return null;
-  const v = (isNum(windMs) ? windMs * 3.6 : 0) + RIDE_KMH;
+  const v = (isNum(windMs) ? windMs * 3.6 : 0) + rideKmh;
   if (temp > 10) return temp - Math.min(3, v / 15);
   const p = Math.pow(v, 0.16);
   return 13.12 + 0.6215 * temp - 11.37 * p + 0.3965 * temp * p;
 }
 
-// Kleidung + Warnungen für eine Liste von Stunden (vereinfacht: Handschuhe+Kappe ja/nein, oben und Hose dick/dünn).
-const COLD_HANDS = 10;   // gefühlt am Rad unter 10 °C → Handschuhe + Kappe
-const COLD_BODY = 5;     // gefühlt am Rad unter 5 °C → dicke Jacke und dicke Hose
-function clothing(hours) {
-  const hs = hours.filter((h) => isNum(h.temp));
-  if (!hs.length) return null;
-  const feels = hs.map((h) => h.feel ?? rideFeel(h.temp, h.wind)).filter(isNum);
-  const fMin = Math.min(...feels);
-  const tMin = Math.min(...hs.map((h) => h.temp)), tMax = Math.max(...hs.map((h) => h.temp));
-  const max = (k) => { const v = hs.map((h) => h[k]).filter(isNum); return v.length ? Math.max(...v) : null; };
-  const pMax = max('prob') ?? 0;
-  const pHeavy = max('pHeavy') ?? 0;
-  const mmSum = hs.reduce((s, h) => s + (isNum(h.mm) ? h.mm : 0), 0);
-  const gustKmh = isNum(max('gust')) ? max('gust') * 3.6 : null;
-  const snowy = hs.some((h) => h.snow && (h.prob ?? 0) >= 30);
-  const ice = tMin <= 1 && (pMax >= 30 || snowy);
-  const storm = isNum(gustKmh) && gustKmh >= 60;
-
-  const gloves = fMin < COLD_HANDS;
-  const top = fMin < COLD_BODY ? 'dick' : 'dünn';
-  const pants = fMin < COLD_BODY ? 'dick' : 'dünn';
-  const rain = pMax >= 60 || mmSum >= 1 ? 'anziehen' : pMax >= 30 ? 'einpacken' : null;
-
-  const warnings = [];
-  if (pHeavy >= 25) warnings.push(`Starkregen möglich (${fmt0(pHeavy)} %)`);
-  if (ice) warnings.push('Glättegefahr');
-  if (snowy) warnings.push('Schneefall möglich');
-  if (isNum(gustKmh) && gustKmh >= 45) warnings.push(`Böen bis ${fmt0(gustKmh)} km/h`);
-
-  // Ampel: fahren / aufpassen / nicht fahren (nur Starkregen verbietet das Fahren)
-  let verdict = 'ok';
-  if (pHeavy >= 25 || ice || storm || (snowy && pMax >= 50)) verdict = 'warn';
-  if (pHeavy >= 50) verdict = 'stop';
-
-  return { gloves, top, pants, rain, warnings, verdict, tMin, tMax, fMin, pMax, pHeavy, mmSum, ice, snowy, storm,
-    range: hs.some((h) => h.range === 'lang') ? 'lang' : 'kurz' };
+// ---------- Schnee auf der Fahrbahn ----------
+// Wahrscheinlichkeit (%), dass zwischen fromT und toT (Stunden-Endzeitpunkte, ms) mindestens thrCm Neuschnee fällt.
+// Je Ensemble-Lauf wird der Schnee aufsummiert und gezählt; ICON-D2 bevorzugt, sonst ECMWF.
+// GeoSphere-Hauptlauf (Schnee in mm Wasser ≈ cm Neuschnee) fließt mit 30 % ein, wenn er den Zeitraum abdeckt.
+function snowRisk(fromT, toT, sources, thrCm) {
+  const keys = [];
+  for (let t = fromT + HOUR; t <= toT; t += HOUR) keys.push(t);
+  const fromEns = (src) => {
+    if (!src?.rows) return null;
+    const rows = keys.map((k) => src.rows.get(k));
+    if (rows.some((r) => !r || !r.snowM || !r.snowM.length)) return null;
+    const n = rows[0].snowM.length;
+    let hit = 0;
+    for (let m = 0; m < n; m++) {
+      const sum = rows.reduce((s, r) => s + (isNum(r.snowM[m]) ? r.snowM[m] : 0), 0);
+      if (sum >= thrCm) hit++;
+    }
+    return 100 * hit / n;
+  };
+  let pEns = fromEns(sources.om), trend = false;
+  if (!isNum(pEns)) { pEns = fromEns(sources.ecm); trend = isNum(pEns); }
+  const nwp = sources.gs?.res?.nwp?.rows;
+  let pNwp = null;
+  if (nwp && keys.every((k) => nwp.has(k))) {
+    const sum = keys.reduce((s, k) => s + (nwp.get(k).sf || 0), 0);
+    pNwp = probFromAmount(sum, thrCm * 0.5, thrCm * 1.5);
+  }
+  const p = combine([{ p: pEns, w: 0.7 }, { p: pNwp, w: 0.3 }]);
+  return { p, trend };
 }
 
-// Kurzer Kleidungstext, z. B. "Handschuhe + Kappe · Jacke dick · Hose dick · Regenzeug einpacken"
-function clothingText(c) {
-  return [c.gloves ? 'Handschuhe + Kappe' : 'ohne Handschuhe', `Jacke ${c.top}`, `Hose ${c.pants}`,
-    c.rain ? `Regenzeug ${c.rain}` : null].filter(Boolean).join(' · ');
+// ---------- Kleidung ----------
+// prefs.levels: [{ below: 10, text }, { below: 15, text }, { below: 20, text }, { below: null, text }] – gefühlte Temperatur am Rad.
+function outfit(feel, prefs) {
+  for (const l of prefs.levels) if (l.below == null || feel < l.below) return l.text;
+  return prefs.levels[prefs.levels.length - 1].text;
+}
+
+// Bewertung einer Fahrt: Stunden der Fahrt + Schnee-Risiko → Ampel, Gründe, Kleidung.
+function assessRide(hs, snow, prefs) {
+  hs = hs.filter((h) => isNum(h.temp));
+  if (!hs.length) return null;
+  const max = (k) => { const v = hs.map((h) => h[k]).filter(isNum); return v.length ? Math.max(...v) : null; };
+  const fMin = Math.min(...hs.map((h) => h.feel).filter(isNum));
+  const tMin = Math.min(...hs.map((h) => h.temp));
+  const pMax = max('prob') ?? 0;
+  const pHeavy = max('pHeavy') ?? 0;
+  const pSnow = snow && isNum(snow.p) ? snow.p : 0;
+  const gustKmh = isNum(max('gust')) ? max('gust') * 3.6 : null;
+  const ice = tMin <= 1 && (pMax >= 30 || pSnow >= 25);
+  const storm = isNum(gustKmh) && gustKmh >= 60;
+
+  const reasons = [];
+  if (pSnow >= 25) reasons.push(pSnow >= 50 ? `Schneefahrbahn (${fmt0(pSnow)} %)` : `evtl. Schnee (${fmt0(pSnow)} %)`);
+  if (pHeavy >= 25) reasons.push(pHeavy >= 50 ? `viel Regen (${fmt0(pHeavy)} %)` : `evtl. viel Regen (${fmt0(pHeavy)} %)`);
+  if (ice && pSnow < 25) reasons.push('Glättegefahr');
+  if (storm) reasons.push(`Sturmböen ${fmt0(gustKmh)} km/h`);
+
+  let verdict = 'ok';
+  if (reasons.length) verdict = 'warn';
+  if (pHeavy >= 50 || pSnow >= 50) verdict = 'stop';
+
+  let clothes = outfit(fMin, prefs);
+  if (pMax >= 30 && verdict !== 'stop') clothes += ' + Regenjacke';
+  return { verdict, reasons, clothes, fMin, tMin, pMax, pHeavy, pSnow, ice, storm,
+    trend: hs.some((h) => h.range === 'lang') || !!snow?.trend };
 }

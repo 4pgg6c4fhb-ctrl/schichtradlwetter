@@ -1,41 +1,38 @@
-# Mein Wetter
+# Radwetter
 
-Persönliche Wetter-App (PWA) fürs Radfahren in Wörgl (Tirol). Sie berechnet die
-**Regenwahrscheinlichkeit pro Stunde** (≥ 0,1 mm) aus mehreren Quellen:
+Persönliche Wetter-App (PWA) fürs Radfahren zur Arbeit in Wörgl (Tirol), passend zum
+10-Tage-Schichtrad (2× Früh 6–14, 2× Spät 14–22, 2× Nacht 22–6, 4 Tage frei).
 
-Alle Quellen sind kostenlos und brauchen keinen API-Key.
+Eine Seite:
 
-| Quelle | Daten | Gewicht |
-| --- | --- | --- |
-| GeoSphere Austria – Ensemble `ensemble-v2-1h-1km` | 10./50./90. Perzentil Niederschlag → geschätzte Wahrscheinlichkeit | 40 % |
-| DWD ICON-D2-EPS über Open-Meteo (Ensemble-API) | 20 Läufe → Anteil der Läufe mit Regen | 40 % |
-| GeoSphere Austria – Modell `nwp-v2-1h-1km` | Niederschlagsmenge, Temperatur, Wind, Wolken | 20 % |
-| GeoSphere Nowcast `nowcast-v1-15min-1km` | Radar-Hochrechnung, dominiert die ersten 3 h | abklingend |
+- **Nächste Fahrt** groß: fahren / aufpassen / nicht fahren, gefühlte Temperatur am Rad,
+  Regen, Schnee, was anziehen.
+- **Schichtrad-Zusammenfassung** als Text, z. B. „Fahrten im ganzen Schichtrad möglich“
+  oder „Bei der zweiten Spätschicht ist am Heimweg mit viel Regen zu rechnen“.
+- **Alle Schichten** der nächsten 10 Tage mit Hin- und Heimweg.
 
-Fehlt eine Quelle, werden die übrigen Gewichte hochskaliert. Details zu jeder
-Stunde sieht man durch Antippen der Zeile.
+## Regeln (alle unter ⚙︎ einstellbar)
 
-## Nutzung
+| | Standard |
+| --- | --- |
+| Kleidung unter 10 °C gefühlt | Handschuhe, Kappe, Fleece, Iso, Windjacke, Isohose |
+| unter 15 °C | Fleece, Windjacke, Radhose |
+| unter 20 °C | Fleece, lange Radhose |
+| darüber | Alles kurz |
+| Zu viel Regen | ab 0,5 mm/h (mehr als Tröpfeln) |
+| Schneefahrbahn | ab 1 cm Neuschnee – Hinweg: 6 h davor, Heimweg: während der Schicht |
+| Gefühlt am Rad | Windchill mit Wind + 20 km/h Fahrtwind |
 
-Statische Dateien, kein Build. GPS braucht HTTPS, z. B. GitHub Pages (gratis nur bei öffentlichem Repository):
-Repository → Settings → Pages → „Deploy from a branch“ → Branch wählen, Ordner `/`.
-Dann die Seite am Handy öffnen und „Zum Home-Bildschirm“ hinzufügen.
+🚫 *Nicht fahren*, wenn mindestens die Hälfte der Wetterläufe zu viel Regen oder
+Schneefahrbahn bringt; ⚠️ *aufpassen* ab 25 %, bei Glätte oder Sturmböen.
 
-Lokal testen: `python3 -m http.server` und `http://localhost:8000` öffnen.
+## Quellen (alle kostenlos, ohne Key)
 
-Kachelmannwetter ist nicht enthalten: dessen API gibt es nur mit kostenpflichtigem
-Plus-Abo. ICON-D2 (DWD) ist eines der Modelle, die Kachelmann selbst anzeigt.
+- GeoSphere Austria: Modell `nwp-v2-1h-1km`, Ensemble `ensemble-v2-1h-1km`, Radar-Hochrechnung `nowcast-v1-15min-1km`
+- DWD ICON-D2-Ensemble (20 Läufe) über Open-Meteo, ca. 2 Tage
+- ECMWF-Ensemble (51 Läufe) über Open-Meteo, bis 12 Tage – in der App als „Trend“ markiert
 
-Open-Meteo ist für private, nicht-kommerzielle Nutzung gratis (10 000 Abfragen/Tag);
-die App cached 15 min.
+## Betrieb
 
-GeoSphere deckt Mitteleuropa ab, der Nowcast nur Österreich.
-
-
-## Radkleidung
-
-Oben in der App steht die passende Radkleidung für die nächsten 12 Stunden
-(Handschuhe, Mütze, Jacke, Hose, Überschuhe, Regenzeug, Licht, Glätte-/Sturmwarnung).
-Gerechnet wird mit der **gefühlten Temperatur auf dem Rad** (Wind + 20 km/h Fahrtwind).
-
-Standort ist fest **Wörgl (Tirol)**; unter ⚙︎ änderbar, beide Felder leeren = GPS.
+Statische Dateien, kein Build, veröffentlicht über GitHub Pages (Branch `main`, Ordner `/`).
+Lokal: `python3 -m http.server` und `http://localhost:8000` öffnen.

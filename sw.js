@@ -1,5 +1,5 @@
 // App-Hülle offline verfügbar machen; Wetterdaten immer frisch aus dem Netz.
-const CACHE = 'wetter-v4';
+const CACHE = 'wetter-v5';
 const SHELL = ['./', 'index.html', 'core.js', 'app.js', 'manifest.webmanifest', 'icon.svg'];
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', (e) => e.waitUntil(
