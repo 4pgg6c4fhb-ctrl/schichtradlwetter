@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mein Wetter</title>
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root {
+  --bg: #f1f5f9; --card: #ffffff; --text: #0f172a; --muted: #64748b; --line: #e2e8f0;
+  --accent: #2563eb; --rain: #2563eb; --rain-soft: #bfdbfe; --warn: #b45309; --err: #b91c1c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1120; --card: #131c2e; --text: #e2e8f0; --muted: #94a3b8; --line: #1e293b;
+    --accent: #60a5fa; --rain: #60a5fa; --rain-soft: #1e3a8a; --warn: #fbbf24; --err: #f87171;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) 16px 40px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 12px; }
+header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+#place { color: var(--muted); font-size: 13px; }
+button { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 7px 12px; cursor: pointer; }
+button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+.now { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: center; }
+.now .icon { font-size: 52px; line-height: 1; grid-row: span 2; }
+.now .temp { font-size: 44px; font-weight: 600; letter-spacing: -1px; }
+.now .desc { color: var(--muted); }
+.big-prob { display: flex; align-items: baseline; gap: 8px; margin-top: 12px; }
+.big-prob b { font-size: 28px; color: var(--rain); white-space: nowrap; }
+.muted { color: var(--muted); font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); }
+.status .err { color: var(--err); }
+.status .warn { color: var(--warn); }
+h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.nowcast { display: flex; align-items: flex-end; gap: 3px; height: 70px; }
+.nowcast div { flex: 1; background: var(--rain); border-radius: 3px 3px 0 0; min-height: 2px; opacity: .85; }
+.nowcast-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; }
+.days { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; }
+.day { text-align: center; padding: 8px 4px; border-radius: 12px; background: var(--bg); }
+.day .i { font-size: 26px; }
+.day .p { color: var(--rain); font-weight: 600; }
+.hours { width: 100%; border-collapse: collapse; }
+.hours td { padding: 7px 4px; border-top: 1px solid var(--line); vertical-align: middle; }
+.hours tr.daysep td { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; padding-top: 14px; border-top: none; }
+.hours .t { width: 48px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hours .i { width: 30px; font-size: 20px; text-align: center; }
+.hours .tmp { width: 56px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hours .pb { padding-left: 12px; }
+.bar { position: relative; height: 18px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+.bar > span { position: absolute; inset: 0 auto 0 0; background: var(--rain-soft); }
+.bar > em { position: absolute; left: 6px; top: 0; font-style: normal; font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.hours .mm { width: 56px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hours tr.detail td { border-top: none; padding-top: 0; font-size: 12px; color: var(--muted); }
+.hours tr.h { cursor: pointer; }
+dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); width: min(520px, calc(100% - 32px)); padding: 18px; }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+input { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+details p, details li { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Mein Wetter</h1>
+      <div id="place">Standort wird ermittelt …</div>
+    </div>
+    <div class="row" style="flex:none">
+      <button id="btnReload" aria-label="Aktualisieren">↻</button>
+      <button id="btnSettings" aria-label="Einstellungen">⚙︎</button>
+    </div>
+  </header>
+
+  <section class="card" id="nowCard">
+    <div class="now">
+      <div class="icon" id="nowIcon">·</div>
+      <div class="temp" id="nowTemp">–</div>
+      <div class="desc" id="nowDesc">Lade Daten …</div>
+    </div>
+    <div class="big-prob"><b id="nowProb">–</b><span class="muted" id="nowProbText">Regenwahrscheinlichkeit nächste Stunde</span></div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section class="card" id="nowcastCard" hidden>
+    <h2>Niederschlag nächste 3 Stunden <span class="muted">(GeoSphere Nowcast, 15 min)</span></h2>
+    <div class="nowcast" id="nowcast"></div>
+    <div class="nowcast-labels" id="nowcastLabels"></div>
+  </section>
+
+  <section class="card">
+    <h2>Tage</h2>
+    <div class="days" id="days"></div>
+  </section>
+
+  <section class="card">
+    <h2>Stündlich <span class="muted">(Zeile antippen für Quellen)</span></h2>
+    <table class="hours"><tbody id="hours"></tbody></table>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Wie wird die Wahrscheinlichkeit berechnet?</summary>
+      <p>Gemeint ist die Wahrscheinlichkeit für mindestens <b>0,1 mm Niederschlag</b> in der jeweiligen Stunde an deinem Standort.</p>
+      <ul>
+        <li><b>GeoSphere Ensemble</b> (C-LAEF, 1 km): aus dem 10., 50. und 90. Perzentil wird abgeschätzt, wie viele Ensemble-Läufe über 0,1 mm liegen. Gewicht 50 %.</li>
+        <li><b>GeoSphere Hauptlauf</b> (AROME, 1 km): Menge → weicher Ja/Nein-Wert. Gewicht 20 %.</li>
+        <li><b>Kachelmannwetter</b> (Super-HD-Modellmix): Menge → weicher Ja/Nein-Wert. Gewicht 30 %.</li>
+        <li><b>GeoSphere Nowcast</b> (Radar-Hochrechnung): dominiert die ersten 3 Stunden und verliert dann linear an Gewicht.</li>
+      </ul>
+      <p>Fehlt eine Quelle, werden die Gewichte der übrigen hochgerechnet. Temperatur = Mittel aus GeoSphere und Kachelmann; die Spanne darunter ist das 10.–90. Perzentil des Ensembles.</p>
+    </details>
+  </section>
+</main>
+
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h2>Einstellungen</h2>
+    <label for="kmwKey">Kachelmannwetter API-Key <span class="muted">(Plus-Abo nötig, wird nur auf diesem Gerät gespeichert)</span></label>
+    <input id="kmwKey" type="password" autocomplete="off" placeholder="leer = nur GeoSphere">
+    <p class="muted">Key erstellen: accounts.meteologix.com → Abos → „API-Keys verwalten“. Beim Hobby-Tarif muss dein Standort dort auch als API-Standort eingetragen sein.</p>
+    <label>Fester Standort <span class="muted">(leer = GPS)</span></label>
+    <div class="row">
+      <input id="fixLat" inputmode="decimal" placeholder="Breite, z. B. 48.208">
+      <input id="fixLon" inputmode="decimal" placeholder="Länge, z. B. 16.373">
+    </div>
+    <label for="placeName">Name des Orts</label>
+    <input id="placeName" placeholder="z. B. Zuhause">
+    <div class="actions">
+      <button value="cancel" formnovalidate>Abbrechen</button>
+      <button value="save" class="primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
