@@ -1,0 +1,25 @@
+{
+  "ort": { "name": "Zuhause", "lat": 48.2082, "lon": 16.3738 },
+  "zeitzone": "Europe/Vienna",
+  "vorlaufMinuten": 60,
+  "stunden": 12,
+
+  "wochenplan": {
+    "Mo": "06:00",
+    "Di": "06:00",
+    "Mi": "06:00",
+    "Do": "06:00",
+    "Fr": "06:00",
+    "Sa": null,
+    "So": null
+  },
+
+  "einzeltermine": [
+    "2026-12-06 14:00"
+  ],
+
+  "frei": [
+    "2026-12-24",
+    "2026-12-25"
+  ]
+}

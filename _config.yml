@@ -1,0 +1,4 @@
+# GitHub Pages: Schichtplan und Skripte nicht veröffentlichen.
+exclude:
+  - benachrichtigung
+  - README.md

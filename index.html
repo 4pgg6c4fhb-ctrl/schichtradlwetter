@@ -69,6 +69,9 @@ input { width: 100%; font: inherit; color: var(--text); background: var(--bg); b
 .row { display: flex; gap: 8px; }
 .row > * { flex: 1; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.cloth { list-style: none; padding: 0; margin: 10px 0 0; }
+.cloth li { padding: 6px 0; border-top: 1px solid var(--line); }
+.cloth li.warn { color: var(--warn); font-weight: 600; }
 details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 details p, details li { font-size: 13px; color: var(--muted); }
 </style>
@@ -94,6 +97,12 @@ details p, details li { font-size: 13px; color: var(--muted); }
     </div>
     <div class="big-prob"><b id="nowProb">–</b><span class="muted" id="nowProbText">Regenwahrscheinlichkeit nächste Stunde</span></div>
     <div class="status" id="status"></div>
+  </section>
+
+  <section class="card" id="clothCard" hidden>
+    <h2>Radkleidung nächste 12 Stunden</h2>
+    <div class="muted" id="clothSummary"></div>
+    <ul class="cloth" id="clothList"></ul>
   </section>
 
   <section class="card" id="nowcastCard" hidden>
@@ -144,6 +153,7 @@ details p, details li { font-size: 13px; color: var(--muted); }
   </form>
 </dialog>
 
+<script src="core.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
