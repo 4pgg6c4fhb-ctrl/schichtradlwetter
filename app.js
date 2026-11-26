@@ -8,6 +8,7 @@ const SETTINGS_VERSION = 2;
 const DEFAULTS = {
   fixLat: '47.4894', fixLon: '12.0620', placeName: 'Wörgl',
   cycleStart: '2026-11-24',   // erster Frühdienst eines Schichtrads
+  freeOut: '5', freeBack: '16', // freie Tage: Hinfahrt / Rückfahrt (Uhr)
   heavyMm: '0.5',             // mehr als Tröpfeln
   snowCm: '1',
   rideKmh: '20',
@@ -81,26 +82,39 @@ function planShifts(hours, data, s, p) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = Date.now();
   const items = [];
+  const ride = (name, key, snowFrom, snowTo) => {
+    if (key <= now) return null;
+    const h = byT.get(key);
+    const snow = snowRisk(snowFrom, snowTo, data, p.snowCm);
+    const prev = [];
+    for (let t = key - 6 * HOUR; t < key; t += HOUR) if (byT.has(t)) prev.push(byT.get(t));
+    return { name, from: key - HOUR, to: key, h, a: h ? assessRide([h], snow, p, prev) : null };
+  };
+  const at = (d, hour) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(hour), Math.round((hour % 1) * 60)).getTime();
   for (let i = -1; i <= 10; i++) {
     const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-    const sh = shiftFor(d, s.cycleStart);
-    if (!sh) { if (i >= 0) items.push({ free: true, d }); continue; }
-    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), sh.s).getTime();
-    const end = start + sh.len * HOUR;
-    if (end + HOUR <= now) continue;
-    const ride = (name, key, snowFrom, snowTo) => {
-      if (key <= now) return null;
-      const h = byT.get(key);
-      const snow = snowRisk(snowFrom, snowTo, data, p.snowCm);
-      const prev = [];
-      for (let t = key - 6 * HOUR; t < key; t += HOUR) if (byT.has(t)) prev.push(byT.get(t));
-      return { name, from: key - HOUR, to: key, h, a: h ? assessRide([h], snow, p, prev) : null };
-    };
+    let sh = shiftFor(d, s.cycleStart);
+    let start, end, out, back;
+    if (sh) {
+      start = at(d, sh.s);
+      end = start + sh.len * HOUR;
+      out = start;                     // Hinweg: Stunde vor Schichtbeginn
+      back = end + HOUR;               // Heimweg: Stunde nach Schichtende
+    } else {
+      if (i < 0) continue;
+      // Freier Tag: Abfahrt um freeOut, Rückfahrt um freeBack (je 1 Stunde)
+      const o = num(s.freeOut, 5), b = num(s.freeBack, 16);
+      sh = { name: 'Frei', icon: 'calendar', cls: 'off', free: true, out: o, back: b };
+      start = at(d, o); end = at(d, b);
+      out = start + HOUR;
+      back = end + HOUR;
+    }
+    if (back <= now) continue;
     items.push({
       d, sh, i, start, end,
       rides: [
-        ride('Hinweg', start, start - SNOW_BEFORE_H * HOUR, start),
-        ride('Heimweg', end + HOUR, start - HOUR, end + HOUR),   // Schnee während der ganzen Schicht
+        ride('Hinweg', out, out - HOUR - SNOW_BEFORE_H * HOUR, out),   // Neuschnee der 6 h vor Abfahrt
+        ride('Heimweg', back, out - HOUR, back),   // Schnee seit der Hinfahrt zählt
       ].filter(Boolean),
     });
   }
@@ -157,7 +171,6 @@ function renderNext(items) {
   const el = $('next');
   let found = null;
   for (const it of items) {
-    if (it.free) continue;
     const r = it.rides.find((x) => x.a);
     if (r) { found = { it, r }; break; }
   }
@@ -188,9 +201,9 @@ function renderNext(items) {
 function renderSummary(items, s) {
   const notes = { stop: [], warn: [], none: 0 };
   for (const it of items) {
-    if (it.free || !it.rides.length) continue;
+    if (!it.rides.length) continue;
     if (it.rides.some((r) => !r.a)) { notes.none++; if (!it.rides.some((r) => r.a)) continue; }
-    const who = `${dayLabel(it.i, it.d)} · ${shiftOrdinal(it.d, s).startsWith('zweiten') ? '2.' : '1.'} ${it.sh.name}schicht`;
+    const who = it.sh.free ? `${dayLabel(it.i, it.d)} · frei` : `${dayLabel(it.i, it.d)} · ${shiftOrdinal(it.d, s).startsWith('zweiten') ? '2.' : '1.'} ${it.sh.name}schicht`;
     const where = (pred) => {
       const n = it.rides.filter((r) => r.a && pred(r.a)).map((r) => r.name);
       return n.length === 2 ? 'Hin- und Heimweg' : n[0];
@@ -212,16 +225,16 @@ function renderSummary(items, s) {
     if (w.length) notes.warn.push([who, `${w.join(' · ')}${unsure}.`]);
   }
   const head = notes.stop.length
-    ? `<div class="verdict-line stop">${icon('stop')}<span>${notes.stop.length === 1 ? 'Eine Schicht' : notes.stop.length + ' Schichten'} besser nicht mit dem Rad</span></div>`
+    ? `<div class="verdict-line stop">${icon('stop')}<span>${notes.stop.length === 1 ? 'Ein Tag' : notes.stop.length + ' Tage'} besser nicht mit dem Rad</span></div>`
     : `<div class="verdict-line ok">${icon('ok')}<span>Fahrten im ganzen Schichtrad möglich${notes.warn.length ? '' : ' – kein Schnee und kein Starkregen in Sicht'}</span></div>`;
   const li = (cls, [who, text]) => `<li class="${cls}"><span class="when">${esc(who)}</span> – ${esc(text)}</li>`;
   const list = [...notes.stop.map((n) => li('stop', n)), ...notes.warn.map((n) => li('warn', n))];
-  if (notes.none) list.push(`<li class="info">Für ${notes.none === 1 ? 'eine Schicht' : notes.none + ' Schichten'} gibt es noch keine Vorhersage.</li>`);
+  if (notes.none) list.push(`<li class="info">Für ${notes.none === 1 ? 'einen Tag' : notes.none + ' Tage'} gibt es noch keine Vorhersage.</li>`);
   $('shiftSummary').innerHTML = head + (list.length ? `<ul class="notes">${list.join('')}</ul>` : '');
 }
 
-function rideHtml(r) {
-  const name = `<span class="ride-name">${icon(r.name === 'Hinweg' ? 'work' : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
+function rideHtml(r, free = false) {
+  const name = `<span class="ride-name">${icon(r.name === 'Hinweg' ? (free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
   if (!r.a) return `<div class="ride none"><div class="ride-row">${name}</div><div class="ride-vals">noch keine Vorhersage</div></div>`;
   const a = r.a;
   return `<div class="ride ${a.verdict}">
@@ -232,28 +245,20 @@ function rideHtml(r) {
 }
 
 function renderShifts(items) {
-  const html = [];
-  for (let k = 0; k < items.length; k++) {
-    const it = items[k];
-    if (it.free) {
-      let j = k;
-      while (j + 1 < items.length && items[j + 1].free) j++;
-      const n = j - k + 1;
-      const range = n === 1 ? shortDayFmt.format(it.d) : `${shortDayFmt.format(it.d)} – ${shortDayFmt.format(items[j].d)}`;
-      html.push(`<div class="free"><div class="ic">${icon('calendar')}</div><div><b>${n === 1 ? 'Frei' : `${n} Tage frei`}</b> · ${range}</div></div>`);
-      k = j;
-      continue;
-    }
+  $('shifts').innerHTML = items.map((it) => {
     const trend = it.rides.some((r) => r.a?.trend);
-    html.push(`<div class="shift">
+    const title = it.sh.free
+      ? `Frei <small>Hin ${fmtH(it.sh.out)} · zurück ${fmtH(it.sh.back)} Uhr</small>`
+      : `${it.sh.name}schicht <small>${it.sh.s}–${(it.sh.s + it.sh.len) % 24} Uhr</small>`;
+    return `<div class="shift">
       <div class="date${it.i === 0 ? ' today' : ''}"><div class="wd">${it.i === 0 ? 'Heute' : wdFmt.format(it.d)}</div><div class="d">${it.d.getDate()}</div></div>
       <div>
-        <div class="shift-title"><span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span>${it.sh.name}schicht <small>${it.sh.s}–${(it.sh.s + it.sh.len) % 24} Uhr</small></span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
-        ${it.rides.map(rideHtml).join('')}
-      </div></div>`);
-  }
-  $('shifts').innerHTML = html.join('');
+        <div class="shift-title"><span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span>${title}</span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
+        ${it.rides.map((r) => rideHtml(r, it.sh.free)).join('')}
+      </div></div>`;
+  }).join('');
 }
+const fmtH = (h) => (h % 1 ? `${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}` : String(h));
 
 function setStatus(parts) { $('status').innerHTML = parts.filter(Boolean).join('<br>'); }
 

@@ -118,6 +118,7 @@ header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
 .badge .dot svg.i { width: 15px; height: 15px; }
 .early .dot { color: var(--early); background: color-mix(in srgb, var(--early) 15%, transparent); }
 .late .dot { color: var(--late); background: color-mix(in srgb, var(--late) 16%, transparent); }
+.off .dot { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
 .night .dot { color: var(--night); background: color-mix(in srgb, var(--night) 16%, transparent); }
 .badge small { font-weight: 500; color: var(--muted); font-size: 13px; }
 .ride { padding: 8px 0; border-top: 1px dashed var(--border); }
@@ -194,7 +195,8 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
       <p><b>Gefühlt</b> = Temperatur am Rad mit Wind + Fahrtwind.</p>
       <p><b>Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe mehr Regen als deine Grenze bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder Schneefahrbahn droht. <b>Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
       <p><b>Glätte</b> nur bei Feuchtigkeit: nasse Fahrbahn bei Frost (Niederschlag jetzt oder in den 6 Stunden davor) oder Reif (Frost + Luftfeuchte ab 92 % bei klarem Himmel, Nebelreif ab 97 %).</p>
-      <p><b>Schnee:</b> Hinweg = Neuschnee der 6 Stunden davor, Heimweg = Neuschnee während der ganzen Schicht.</p>
+      <p><b>Schnee:</b> Hinweg = Neuschnee der 6 Stunden davor, Heimweg = Neuschnee seit der Hinfahrt (ganze Schicht).</p>
+      <p><b>Freie Tage:</b> Hinfahrt um 5, Rückfahrt um 16 Uhr (einstellbar).</p>
       <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble, ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
     </details>
   </section>
@@ -232,6 +234,11 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
       <legend>Schicht &amp; Ort</legend>
       <label for="cycleStart">Erster Frühdienst (6–14) des Schichtrads</label>
       <input id="cycleStart" type="date">
+      <label>Freie Tage: Hinfahrt und Rückfahrt (Uhr)</label>
+      <div class="row">
+        <input id="freeOut" inputmode="decimal" placeholder="5">
+        <input id="freeBack" inputmode="decimal" placeholder="16">
+      </div>
       <label>Standort (beide leer = GPS)</label>
       <div class="row">
         <input id="fixLat" inputmode="decimal" placeholder="Breite 47.489">
