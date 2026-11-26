@@ -284,6 +284,3 @@ function clothing(hours) {
   return { items, warnings, summary, tMin, tMax, fMin, pMax, mmSum };
 }
 
-if (typeof module !== 'undefined') {
-  module.exports = { fetchGeoSphere, fetchOpenMeteo, buildHours, clothing, rideFeel, probFromPercentiles, HOUR, isNum, fmt0, fmt1 };
-}

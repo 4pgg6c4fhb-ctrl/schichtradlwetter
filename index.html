@@ -81,7 +81,7 @@ details p, details li { font-size: 13px; color: var(--muted); }
   <header>
     <div>
       <h1>Mein Wetter</h1>
-      <div id="place">Standort wird ermittelt …</div>
+      <div id="place">Wörgl</div>
     </div>
     <div class="row" style="flex:none">
       <button id="btnReload" aria-label="Aktualisieren">↻</button>
@@ -139,13 +139,13 @@ details p, details li { font-size: 13px; color: var(--muted); }
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
     <h2>Einstellungen</h2>
-    <label>Fester Standort <span class="muted">(leer = GPS)</span></label>
+    <label>Standort <span class="muted">(beide Felder leer = GPS)</span></label>
     <div class="row">
-      <input id="fixLat" inputmode="decimal" placeholder="Breite, z. B. 48.208">
-      <input id="fixLon" inputmode="decimal" placeholder="Länge, z. B. 16.373">
+      <input id="fixLat" inputmode="decimal" placeholder="Breite, z. B. 47.489">
+      <input id="fixLon" inputmode="decimal" placeholder="Länge, z. B. 12.062">
     </div>
     <label for="placeName">Name des Orts</label>
-    <input id="placeName" placeholder="z. B. Zuhause">
+    <input id="placeName" placeholder="z. B. Wörgl">
     <div class="actions">
       <button value="cancel" formnovalidate>Abbrechen</button>
       <button value="save" class="primary">Speichern</button>

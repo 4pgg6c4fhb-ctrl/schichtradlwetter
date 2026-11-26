@@ -4,7 +4,8 @@
 const $ = (id) => document.getElementById(id);
 
 function settings() {
-  return Object.assign({ fixLat: '', fixLon: '', placeName: '' }, load('settings', {}));
+  // Standard: Wörgl (Tirol). In den Einstellungen änderbar; Felder leeren = GPS.
+  return Object.assign({ fixLat: '47.4894', fixLon: '12.0620', placeName: 'Wörgl' }, load('settings', {}));
 }
 
 // ---------- Standort ----------
@@ -142,7 +143,7 @@ async function run() {
     setStatus(['Standort wird ermittelt …']);
     const pos = await getPosition();
     if (!pos.fixed && !pos.stale) store('lastPos', { lat: pos.lat, lon: pos.lon, acc: pos.acc });
-    const name = s.placeName || (pos.fixed ? 'Fester Standort' : 'Mein Standort');
+    const name = s.placeName || (pos.fixed ? 'Fester Standort' : 'GPS-Standort');
     $('place').textContent = `${name} · ${pos.lat.toFixed(3)}, ${pos.lon.toFixed(3)}` +
       (pos.acc ? ` (±${Math.round(pos.acc)} m)` : '') + (pos.stale ? ' · letzter bekannter' : '');
 
