@@ -49,55 +49,57 @@ function shiftFor(date, cycleStart) {
 
 // ---------- Darstellung ----------
 const timeFmt = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-digit' });
-const hr = (t) => String(new Date(t).getHours());
-const dayFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'numeric' });
 const shortDayFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short', day: 'numeric', month: 'numeric' });
 const wdFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short' });
+const hr = (t) => String(new Date(t).getHours());
 const VERDICT = { ok: ['✅', 'Fahren'], warn: ['⚠️', 'Aufpassen'], stop: ['🚫', 'Nicht fahren: zu starker Regen'] };
 const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+const deg = (x) => (isNum(x) ? `${fmt0(x)}°` : '–');
 
-// Symbol-Kacheln; Punkte = Stufe (dünn/mittel/dick). Text erscheint erst nach Antippen der Karte.
+// Symbol-Kacheln im Kreis; Punkte = Stufe (dünn/mittel/dick). Text erscheint erst nach Antippen der Karte.
 function tiles(list, cls = '') {
   return list.map(([icon, text, level]) =>
-    `<span class="tile ${cls}" title="${esc(text)}">${icon}${level ? `<i>${'•'.repeat(level)}</i>` : ''}<small>${esc(text)}</small></span>`).join('');
+    `<span class="tile ${cls}" title="${esc(text)}"><span class="circ">${icon}</span><i>${'•'.repeat(level || 0)}</i><small>${esc(text)}</small></span>`).join('');
 }
 
 function renderNow(hours) {
   const h = hours[0];
   if (!h) return;
   $('nowIcon').textContent = h.icon;
-  $('nowTemp').textContent = isNum(h.temp) ? `${fmt1(h.temp)}°` : '–';
-  $('nowFeel').textContent = isNum(h.feel) ? `🚲 ${fmt0(h.feel)}°` : '';
-  const wind = isNum(h.wind) ? ` · 💨 ${fmt0(h.wind * 3.6)} km/h` + (isNum(h.gust) ? ` (${fmt0(h.gust * 3.6)})` : '') : '';
-  $('nowDesc').textContent = (h.desc || '') + wind;
-  $('nowProb').textContent = isNum(h.prob) ? `💧 ${fmt0(h.prob)} %` : '–';
+  $('nowTemp').innerHTML = isNum(h.temp) ? `${fmt1(h.temp)}<span class="unit">°C</span>` : '–';
+  $('nowDesc').textContent = h.desc || '';
+  $('mFeel').innerHTML = isNum(h.feel) ? `${fmt0(h.feel)}<span class="unit">°</span>` : '–';
+  $('mProb').innerHTML = isNum(h.prob) ? `${fmt0(h.prob)}<span class="unit">%</span>` : '–';
   const next6 = hours.slice(0, 6).map((x) => x.prob).filter(isNum);
-  const max6 = next6.length ? Math.max(...next6) : null;
-  $('nowProbText').textContent = 'nächste Stunde' + (isNum(max6) ? ` · max. ${fmt0(max6)} % in 6 h` : '');
+  $('mProb6').innerHTML = next6.length ? `${fmt0(Math.max(...next6))}<span class="unit">%</span>` : '–';
+  $('mWind').innerHTML = isNum(h.wind) ? `${fmt0(h.wind * 3.6)}<span class="unit">km/h</span>` +
+    (isNum(h.gust) ? `<div class="small">Böen ${fmt0(h.gust * 3.6)} km/h</div>` : '') : '–';
 }
 
 function renderClothing(hours) {
   const c = clothing(hours.slice(0, 12));
   $('clothCard').hidden = !c;
   if (!c) return;
-  $('clothSummary').innerHTML = `🌡️ ${fmt0(c.tMin)}…${fmt0(c.tMax)}° · 🚲 ${fmt0(c.fMin)}° · 💧 ${fmt0(c.pMax)} %`;
+  $('clothSummary').textContent = `🚲 ${deg(c.fMin)} · 💧 ${fmt0(c.pMax)} %`;
   $('clothList').innerHTML = tiles(c.warnings, 'warn') + tiles(c.items);
 }
 
-// Eine Fahrt (Hin oder Heim): Stunde suchen, Ampel + Kleidung als Symbole.
-function rideHtml(label, hourKey, byT) {
-  const h = byT.get(hourKey);
+// Eine Fahrt (Hin oder Heim): Ampel, gefühlte Temperatur, Regen, Kleidung als Symbole.
+function rideHtml(arrow, from, to, hourKey, byT) {
   if (hourKey <= Date.now()) return '';
-  if (!h) return `<div class="ride"><span class="lbl">${label}</span><span class="muted">noch keine Vorhersage</span></div>`;
+  const h = byT.get(hourKey);
+  const lbl = `${arrow} ${hr(from)}–${hr(to)}`;
+  if (!h) return `<div class="ride none"><div class="ride-top"><span class="lbl">${lbl}</span>noch keine Vorhersage</div></div>`;
   const c = clothing([h]);
   const [vi, vt] = VERDICT[c.verdict];
   return `<div class="ride ${c.verdict}">
-    <span class="lbl">${label}</span>
-    <span class="v" title="${vt}">${vi}</span>
-    <span class="num">🚲 ${fmt0(h.feel)}°</span>
-    <span class="num">💧 ${fmt0(h.prob)} %</span>
-    <span class="tiles">${tiles(c.warnings, 'warn')}${tiles(c.items)}</span></div>`;
+    <div class="ride-top"><span class="lbl">${lbl}</span>
+      <span class="big">🚲 ${deg(h.feel)}</span><span>💧 ${fmt0(h.prob)} %</span>
+      <span class="v" title="${vt}">${vi}</span></div>
+    <div class="tiles sm">${tiles(c.warnings, 'warn')}${tiles(c.items)}</div></div>`;
 }
+
+const SHIFT_COLOR = { Früh: 'c-orange', Spät: 'c-purple', Nacht: 'c-night' };
 
 function renderShifts(hours, s) {
   const byT = new Map(hours.map((h) => [h.t, h]));
@@ -107,8 +109,9 @@ function renderShifts(hours, s) {
   let free = null;
   const flushFree = () => {
     if (!free) return;
-    const range = free.from === free.to ? shortDayFmt.format(free.from) : `${shortDayFmt.format(free.from)} – ${shortDayFmt.format(free.to)}`;
-    html.push(`<div class="shift free">🏖️ frei · ${range}</div>`);
+    const n = Math.round((free.to - free.from) / DAY) + 1;
+    const range = n === 1 ? shortDayFmt.format(free.from) : `${shortDayFmt.format(free.from)} – ${shortDayFmt.format(free.to)}`;
+    html.push(`<div class="free"><span class="circ c-green">🏖️</span><div><b style="color:var(--text)">${n === 1 ? 'Frei' : `${n} Tage frei`}</b><br>${range}</div></div>`);
     free = null;
   };
   for (let i = -1; i <= 10; i++) {                       // gestern (Nachtdienst bis 6 Uhr) bis +10 Tage
@@ -123,26 +126,27 @@ function renderShifts(hours, s) {
     const end = start + sh.len * HOUR;
     if (end + HOUR <= Date.now()) continue;            // schon vorbei
     flushFree();
-    const hin = rideHtml(`➡️ ${hr(start - HOUR)}–${hr(start)}`, start, byT);
-    const heim = rideHtml(`⬅️ ${hr(end)}–${hr(end + HOUR)}`, end + HOUR, byT);
-    const rides = [byT.get(start), byT.get(end + HOUR)].filter((h, k) => h && [start, end + HOUR][k] > Date.now());
+    const keys = [start, end + HOUR].filter((k) => k > Date.now());
+    const rides = keys.map((k) => byT.get(k)).filter(Boolean);
     const verdicts = rides.map((h) => clothing([h]));
     const worst = verdicts.some((v) => v.verdict === 'stop') ? 'stop' : verdicts.some((v) => v.verdict === 'warn') ? 'warn' : 'ok';
     const trend = rides.some((h) => h.range === 'lang');
-    const label = `${i === 0 ? 'Heute' : i === 1 ? 'Morgen' : shortDayFmt.format(d)}`;
+    const label = i === 0 ? 'Heute' : i === 1 ? 'Morgen' : shortDayFmt.format(d);
     if (rides.length && worst !== 'ok') {
       const icons = [...new Set(verdicts.flatMap((v) => v.warnings.map((w) => w[0])))].join('');
       problems.push(`${VERDICT[worst][0]} ${label} ${sh.icon} ${icons}`);
     }
     html.push(`<div class="shift">
-      <div class="sh-head"><b>${label}</b> ${sh.icon} ${sh.name} ${sh.s}–${(sh.s + sh.len) % 24}
-        ${rides.length ? `<span class="v">${VERDICT[worst][0]}</span>` : ''}${trend ? '<span class="trend" title="Langfrist-Trend (ECMWF), noch unsicher">≈ Trend</span>' : ''}</div>
-      ${hin}${heim}</div>`);
+      <div class="sh-head"><span class="circ ${SHIFT_COLOR[sh.name]}">${sh.icon}</span>
+        <div><div class="title">${label}${trend ? '<span class="trend" title="Langfrist-Trend (ECMWF), noch unsicher">≈ Trend</span>' : ''}</div>
+        <div class="sub">${sh.name} ${sh.s}–${(sh.s + sh.len) % 24} Uhr</div></div>
+        ${rides.length ? `<span class="v">${VERDICT[worst][0]}</span>` : ''}</div>
+      ${rideHtml('➡️', start - HOUR, start, start, byT)}${rideHtml('⬅️', end, end + HOUR, end + HOUR, byT)}</div>`);
   }
   flushFree();
   $('shiftSummary').innerHTML = problems.length
-    ? problems.map((p) => `<span class="prob-chip">${p}</span>`).join('')
-    : '<span class="prob-chip ok">✅ Keine Wetterprobleme in Sicht</span>';
+    ? problems.map((p) => `<span class="chip">${p}</span>`).join('')
+    : '<span class="chip ok">✅ Keine Wetterprobleme in Sicht</span>';
   $('shifts').innerHTML = html.join('');
 }
 
@@ -154,76 +158,102 @@ function renderNowcast(gs) {
   const max = Math.max(0.5, ...list.map(([, r]) => r.rr || 0));
   $('nowcast').innerHTML = list.map(([t, r]) =>
     `<div title="${timeFmt.format(t)}: ${fmt1(r.rr)} mm" style="height:${Math.max(3, 100 * (r.rr || 0) / max)}%"></div>`).join('');
-  const lab = list.filter((_, i) => i % 4 === 0).map(([t]) => `<span>${timeFmt.format(t)}</span>`);
-  $('nowcastLabels').innerHTML = lab.join('');
+  $('nowcastLabels').innerHTML = list.filter((_, i) => i % 4 === 0).map(([t]) => `<span>${timeFmt.format(t)}</span>`).join('');
   const total = list.reduce((s, [, r]) => s + (r.rr || 0), 0);
   card.hidden = false;
-  card.querySelector('h2 .muted').textContent = total < 0.05 ? '(trocken laut Radar)' : `(${fmt1(total)} mm laut Radar)`;
+  $('nowcastSub').textContent = total < 0.05 ? 'trocken' : `${fmt1(total)} mm`;
 }
 
 function renderDays(hours) {
   const byDay = new Map();
   for (const h of hours) {
-    const key = new Date(h.t).toDateString();
+    const key = new Date(h.t - 1).toDateString();          // Stunde bis 0:00 gehört zum Vortag
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key).push(h);
   }
-  $('days').innerHTML = [...byDay.values()].slice(0, 7).map((hs) => {
+  const days = [...byDay.values()].filter((hs) => hs.length >= 6).slice(0, 7);
+  const all = days.flatMap((hs) => hs.map((h) => h.temp)).filter(isNum);
+  const lo = Math.min(...all), hi = Math.max(...all), span = Math.max(1, hi - lo);
+  $('days').innerHTML = days.map((hs) => {
     const temps = hs.map((h) => h.temp).filter(isNum);
     const feels = hs.map((h) => h.feel).filter(isNum);
     const probs = hs.map((h) => h.prob).filter(isNum);
-    // Wahrscheinlichkeit für "irgendwann Regen" = 1 - Π(1-p) wäre zu hoch (Stunden sind korreliert) → Maximum.
+    const tMin = Math.min(...temps), tMax = Math.max(...temps);
+    // Tageswert = höchste Stunden-Wahrscheinlichkeit (Stunden sind korreliert, Aufsummieren wäre zu hoch).
     const pmax = probs.length ? Math.max(...probs) : null;
     const rep = hs.reduce((a, b) => ((b.prob ?? 0) > (a.prob ?? 0) ? b : a), hs[Math.floor(hs.length / 2)]);
-    const dayIcon = symbol(Object.assign({}, rep, { day: true }))[0];
-    const d = new Date(hs[0].t);
+    const d = new Date(hs[0].t - 1);
     const name = d.toDateString() === new Date().toDateString() ? 'Heute' : wdFmt.format(d);
-    return `<div class="day${hs.some((h) => h.range === 'lang') ? ' trend' : ''}"><div>${name}</div><div class="i">${dayIcon}</div>
-      <div>${temps.length ? `${fmt0(Math.min(...temps))}° / ${fmt0(Math.max(...temps))}°` : '–'}</div>
-      <div class="muted">🚲 ${feels.length ? fmt0(Math.min(...feels)) + '°' : '–'}</div>
-      <div class="p">💧 ${isNum(pmax) ? fmt0(pmax) + ' %' : '–'}</div></div>`;
+    const trend = hs.some((h) => h.range === 'lang');
+    return `<div class="dayrow${trend ? ' lr' : ''}">
+      <div class="n">${name}${trend ? ' ≈' : ''}</div>
+      <div class="i">${symbol(Object.assign({}, rep, { day: true }))[0]}</div>
+      <div class="p">💧${isNum(pmax) ? fmt0(pmax) : '–'}%</div>
+      <div class="range"><span class="lo">${deg(tMin)}</span>
+        <div class="track"><span style="left:${100 * (tMin - lo) / span}%;right:${100 - 100 * (tMax - lo) / span}%"></span></div>
+        <span>${deg(tMax)}</span></div>
+      <div class="fl">🚲 gefühlt bis ${deg(Math.min(...feels))}</div></div>`;
   }).join('');
 }
 
+let hourData = [];
 function renderHours(hours) {
-  let lastDay = '';
-  const html = [];
-  for (const h of hours) {
+  hourData = hours;
+  let lastDay = new Date(hours[0]?.t - 1).toDateString();
+  $('hours').innerHTML = hours.map((h, i) => {
     const d = new Date(h.t);
-    const dk = d.toDateString();
-    if (dk !== lastDay) {
-      lastDay = dk;
-      html.push(`<tr class="daysep"><td colspan="5">${dayFmt.format(d)}</td></tr>`);
-    }
-    const p = isNum(h.prob) ? Math.round(h.prob) : null;
-    const s = h.src;
-    const parts = [
-      isNum(s.pNc) ? `Nowcast ${fmt0(s.pNc)} % (${fmt1(s.nowcastMm)} mm, Gewicht ${fmt0(s.wNc * 100)} %)` : null,
-      isNum(s.pEns) ? `Ensemble ${fmt0(s.pEns)} % (P10/50/90: ${s.ens.map(fmt1).join(' / ')} mm)` : null,
-      isNum(s.pNwp) ? `GeoSphere ${fmt0(s.pNwp)} % (${fmt1(s.nwpMm)} mm)` : null,
-      isNum(s.pOm) ? `ICON-D2 ${fmt0(s.pOm)} % (${Math.round(s.pOm * s.omN / 100)} von ${s.omN} Läufen, Median ${fmt1(s.omMm)} mm)` : null,
-      isNum(s.pEcm) ? `ECMWF ${fmt0(s.pEcm)} % (${Math.round(s.pEcm * s.ecmN / 100)} von ${s.ecmN} Läufen)` : null,
-      isNum(h.pHeavy) && h.pHeavy >= 1 ? `Starkregen ${fmt0(h.pHeavy)} %` : null,
-    ].filter(Boolean);
-    html.push(`<tr class="h" data-t="${h.t}">
-      <td class="t">${timeFmt.format(d)}</td>
-      <td class="i" title="${h.desc}">${h.icon}</td>
-      <td class="tmp">${isNum(h.temp) ? fmt0(h.temp) + '°' : '–'}<small>🚲 ${fmt0(h.feel)}°</small></td>
-      <td class="pb"><div class="bar"><span style="width:${p ?? 0}%"></span><em>${p == null ? '–' : p + ' %'}</em></div></td>
-      <td class="mm">${isNum(h.mm) && h.mm >= 0.05 ? fmt1(h.mm) + ' mm' : ''}</td></tr>
-      <tr class="detail" data-for="${h.t}" hidden><td></td><td colspan="4">${parts.join(' · ')}${isNum(h.wind) ? ` · Wind ${fmt0(h.wind * 3.6)} km/h` : ''}</td></tr>`);
-  }
-  $('hours').innerHTML = html.join('');
+    const dk = new Date(h.t - 1).toDateString();
+    const newDay = dk !== lastDay; lastDay = dk;
+    const p = isNum(h.prob) ? Math.round(h.prob) : 0;
+    return `<div class="hcol${newDay ? ' daystart' : ''}" data-i="${i}">
+      <span class="t">${newDay ? wdFmt.format(d) : hr(h.t - HOUR)}</span>
+      <span class="i" title="${esc(h.desc)}">${h.icon}</span>
+      <span class="tp">${deg(h.temp)}</span>
+      <span class="fl">🚲${deg(h.feel)}</span>
+      <span class="barbox"><span style="height:${Math.max(4, p)}%"></span></span>
+      <span class="pp">${p}%</span></div>`;
+  }).join('');
+  showHourDetail(0);
+}
+
+function showHourDetail(i) {
+  const h = hourData[i];
+  if (!h) return;
+  document.querySelectorAll('.hcol.sel').forEach((el) => el.classList.remove('sel'));
+  document.querySelector(`.hcol[data-i="${i}"]`)?.classList.add('sel');
+  const s = h.src;
+  const parts = [
+    isNum(s.pNc) ? `Radar ${fmt0(s.pNc)} %` : null,
+    isNum(s.pEns) ? `GeoSphere-Ens. ${fmt0(s.pEns)} %` : null,
+    isNum(s.pNwp) ? `GeoSphere ${fmt0(s.pNwp)} %` : null,
+    isNum(s.pOm) ? `ICON-D2 ${Math.round(s.pOm * s.omN / 100)}/${s.omN} Läufe` : null,
+    isNum(s.pEcm) ? `ECMWF ${Math.round(s.pEcm * s.ecmN / 100)}/${s.ecmN} Läufe` : null,
+    isNum(h.mm) && h.mm >= 0.05 ? `${fmt1(h.mm)} mm` : null,
+    isNum(h.pHeavy) && h.pHeavy >= 1 ? `Starkregen ${fmt0(h.pHeavy)} %` : null,
+    isNum(h.wind) ? `💨 ${fmt0(h.wind * 3.6)} km/h` : null,
+  ].filter(Boolean);
+  $('hourDetail').textContent = `${hr(h.t - HOUR)}–${hr(h.t)} Uhr · ${h.desc} · ${parts.join(' · ')}`;
 }
 
 $('hours').addEventListener('click', (ev) => {
-  const tr = ev.target.closest('tr.h');
-  if (!tr) return;
-  const det = $('hours').querySelector(`tr.detail[data-for="${tr.dataset.t}"]`);
-  if (det) det.hidden = !det.hidden;
+  const col = ev.target.closest('.hcol');
+  if (col) showHourDetail(+col.dataset.i);
 });
 // Antippen einer Karte mit Symbolen blendet die Erklärtexte ein/aus.
 document.querySelectorAll('.tap-text').forEach((el) => el.addEventListener('click', () => el.classList.toggle('show-text')));
+
+// ---------- Tabs ----------
+const TITLES = { heute: 'Heute', schichten: 'Schichten', woche: 'Woche' };
+function showTab(name) {
+  if (!TITLES[name]) name = 'heute';
+  document.querySelectorAll('[data-view]').forEach((v) => { v.hidden = v.dataset.view !== name; });
+  document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  $('viewTitle').textContent = TITLES[name];
+  store('tab', name);
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('nav.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+showTab(load('tab', 'heute'));
 
 function setStatus(parts) { $('status').innerHTML = parts.filter(Boolean).join('<br>'); }
 
@@ -238,8 +268,7 @@ async function run() {
     const pos = await getPosition();
     if (!pos.fixed && !pos.stale) store('lastPos', { lat: pos.lat, lon: pos.lon, acc: pos.acc });
     const name = s.placeName || (pos.fixed ? 'Fester Standort' : 'GPS-Standort');
-    $('place').textContent = `${name} · ${pos.lat.toFixed(3)}, ${pos.lon.toFixed(3)}` +
-      (pos.acc ? ` (±${Math.round(pos.acc)} m)` : '') + (pos.stale ? ' · letzter bekannter' : '');
+    $('place').textContent = `📍 ${name}` + (pos.acc ? ` (±${Math.round(pos.acc)} m)` : '') + (pos.stale ? ' · letzter bekannter' : '');
 
     setStatus(['Lade GeoSphere und Open-Meteo …']);
     const [gs, om, ecm] = await Promise.all([
@@ -263,7 +292,7 @@ async function run() {
     renderClothing(hours);
     renderNowcast(gs);
     renderDays(hours);
-    renderHours(hours.slice(0, 48));
+    renderHours(hours.slice(0, 36));
     setStatus(msgs);
   } catch (e) {
     setStatus([`<span class="err">${e.message}</span>`]);
