@@ -58,7 +58,7 @@ function getPosition() {
 // ---------- Schichtrad ----------
 // Schichtsystem aus den Einstellungen, z. B. "1 1 2 2 3 3 f f f f" mit Zeiten "6-14", "14-22", "22-6".
 const DAY = 86400e3;
-const SNOW_BEFORE_H = 6;   // Hinweg: Neuschnee der letzten 6 Stunden zählt
+const SNOW_BEFORE_H = 6;   // Hinfahrt: Neuschnee der letzten 6 Stunden zählt
 
 // "6-14", "6:30 - 14:30", "22–6" → { s: 6, len: 8 }
 function parseSpan(str) {
@@ -132,8 +132,8 @@ function planShifts(hours, data, s, p) {
     if (sh) {
       start = at(d, sh.s);
       end = start + sh.len * HOUR;
-      out = start;                     // Hinweg: Stunde vor Schichtbeginn
-      back = end + HOUR;               // Heimweg: Stunde nach Schichtende
+      out = start;                     // Hinfahrt: Stunde vor Schichtbeginn
+      back = end + HOUR;               // Rückfahrt: Stunde nach Schichtende
     } else {
       if (i < 0) continue;
       // Freier Tag: Abfahrt um freeOut, Rückfahrt um freeBack (je 1 Stunde)
@@ -147,8 +147,8 @@ function planShifts(hours, data, s, p) {
     items.push({
       d, sh, i, start, end,
       rides: [
-        ride('Hinweg', out, out - HOUR - SNOW_BEFORE_H * HOUR, out),   // Neuschnee der 6 h vor Abfahrt
-        ride('Heimweg', back, out - HOUR, back),   // Schnee seit der Hinfahrt zählt
+        ride('Hinfahrt', out, out - HOUR - SNOW_BEFORE_H * HOUR, out),   // Neuschnee der 6 h vor Abfahrt
+        ride('Rückfahrt', back, out - HOUR, back),   // Schnee seit der Hinfahrt zählt
       ].filter(Boolean),
     });
   }
@@ -241,7 +241,7 @@ function renderSummary(items, s) {
     const who = it.sh.free ? `${dayLabel(it.i, it.d)} · frei` : `${dayLabel(it.i, it.d)} · ${shiftNumber(it.d, s)}. ${it.sh.name}schicht`;
     const where = (pred) => {
       const n = it.rides.filter((r) => r.a && pred(r.a)).map((r) => r.name);
-      return n.length === 2 ? 'Hin- und Heimweg' : n[0];
+      return n.length === 2 ? 'Hin- und Rückfahrt' : n[0];
     };
     const unsure = it.rides.some((r) => r.a?.trend) ? ' (noch unsicher)' : '';
     const bad = (k) => it.rides.some((r) => r.a && k(r.a));
@@ -256,7 +256,7 @@ function renderSummary(items, s) {
     ].filter(Boolean).join(' und ');
     const per = it.rides.filter((r) => r.a && issues(r.a)).map((r) => [r.name, issues(r.a)]);
     let w = per.map(([n, t]) => `${n}: ${t}`);
-    if (per.length === 2 && per[0][1] === per[1][1]) w = [`Hin- und Heimweg: ${per[0][1]}`];
+    if (per.length === 2 && per[0][1] === per[1][1]) w = [`Hin- und Rückfahrt: ${per[0][1]}`];
     if (w.length) notes.warn.push([who, `${w.join(' · ')}${unsure}.`]);
   }
   const head = notes.stop.length
@@ -269,7 +269,7 @@ function renderSummary(items, s) {
 }
 
 function rideHtml(r, free = false) {
-  const name = `<span class="ride-name">${icon(r.name === 'Hinweg' ? (free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
+  const name = `<span class="ride-name">${icon(r.name === 'Hinfahrt' ? (free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
   if (!r.a) return `<div class="ride none"><div class="ride-row">${name}</div><div class="ride-vals">noch keine Vorhersage</div></div>`;
   const a = r.a;
   return `<div class="ride ${a.verdict}">
@@ -283,7 +283,7 @@ function renderShifts(items) {
   $('shifts').innerHTML = items.map((it) => {
     const trend = it.rides.some((r) => r.a?.trend);
     const title = it.sh.free
-      ? `Frei <small>Hin ${fmtH(it.sh.out)} · zurück ${fmtH(it.sh.back)} Uhr</small>`
+      ? `Frei <small>Hinfahrt ${fmtH(it.sh.out)} · Rückfahrt ${fmtH(it.sh.back)} Uhr</small>`
       : `${it.sh.name}schicht <small>${fmtH(it.sh.s)}–${fmtH((it.sh.s + it.sh.len) % 24)} Uhr</small>`;
     return `<div class="shift">
       <div class="date${it.i === 0 ? ' today' : ''}"><div class="wd">${it.i === 0 ? 'Heute' : wdFmt.format(it.d)}</div><div class="d">${it.d.getDate()}</div></div>
@@ -308,7 +308,7 @@ const APP_URL = 'https://4pgg6c4fhb-ctrl.github.io/schichtradlwetter/';
 const shareLabel = () => { $('btnShare').innerHTML = `${icon('share')}App teilen`; };
 shareLabel();
 $('btnShare').addEventListener('click', async () => {
-  const data = { title: 'SchichtRADWETTER', text: 'Radwetter für Hin- und Heimweg passend zum Schichtplan:', url: APP_URL };
+  const data = { title: 'SchichtRADWETTER', text: 'Radwetter für Hin- und Rückfahrt, passend zum Schichtplan:', url: APP_URL };
   try {
     if (navigator.share) { await navigator.share(data); return; }
     await navigator.clipboard.writeText(APP_URL);

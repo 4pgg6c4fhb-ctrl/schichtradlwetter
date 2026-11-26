@@ -8,8 +8,8 @@ Eine Seite:
 - **Nächste Fahrt** groß: fahren / aufpassen / nicht fahren, gefühlte Temperatur am Rad,
   Regen, Schnee, was anziehen.
 - **Schichtrad-Zusammenfassung** als Text, z. B. „Fahrten im ganzen Schichtrad möglich“
-  oder „Bei der zweiten Spätschicht ist am Heimweg mit viel Regen zu rechnen“.
-- **Alle Schichten** der nächsten 10 Tage mit Hin- und Heimweg.
+  oder „Bei der zweiten Spätschicht ist bei der Rückfahrt mit viel Regen zu rechnen“.
+- **Alle Schichten** der nächsten 10 Tage mit Hin- und Rückfahrt.
 
 ## Regeln (alle unter ⚙︎ einstellbar)
 
@@ -20,7 +20,7 @@ Eine Seite:
 | unter 20 °C | Fleece, lange Radhose |
 | darüber | Alles kurz |
 | Zu viel Regen | ab 0,5 mm/h (mehr als Tröpfeln) |
-| Schneefahrbahn | ab 1 cm Neuschnee – Hinweg: 6 h davor, Heimweg: während der Schicht |
+| Schneefahrbahn | ab 1 cm Neuschnee – Hinfahrt: 6 h davor, Rückfahrt: während der Schicht |
 | Gefühlt am Rad | Windchill mit Wind + 20 km/h Fahrtwind |
 
 🚫 *Nicht fahren*, wenn mindestens die Hälfte der Wetterläufe zu viel Regen oder
