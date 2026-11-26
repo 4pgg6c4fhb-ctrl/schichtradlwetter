@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Schichtradlwetter</title>
-<meta name="apple-mobile-web-app-title" content="Schichtradl">
-<meta name="application-name" content="Schichtradl">
+<title>SchichtRADWETTER</title>
+<meta name="apple-mobile-web-app-title" content="RADWETTER">
+<meta name="application-name" content="SchichtRADWETTER">
 <meta name="theme-color" content="#0b0d10" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
@@ -46,7 +46,8 @@ header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
   background: linear-gradient(135deg, #3b82f6, #1d4ed8); flex: none; }
 .logo svg.i { width: 22px; height: 22px; }
 .brand { flex: 1; min-width: 0; }
-.brand h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+.brand h1 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: .02em; line-height: 1.2; }
+.brand h1 .pre { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--muted); margin-right: 1px; }
 .brand .loc { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand .loc svg.i { width: 14px; height: 14px; }
 .ghost { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
@@ -168,7 +169,7 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
   <header>
     <div class="logo" id="logo"></div>
     <div class="brand">
-      <h1>Schichtradlwetter</h1>
+      <h1><span class="pre">Schicht</span>RADWETTER</h1>
       <div class="loc" id="place">Wörgl</div>
     </div>
     <button class="ghost" id="btnReload" aria-label="Aktualisieren"></button>
@@ -196,6 +197,7 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
       <p><b>Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe mehr Regen als deine Grenze bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder Schneefahrbahn droht. <b>Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
       <p><b>Glätte</b> nur bei Feuchtigkeit: nasse Fahrbahn bei Frost (Niederschlag jetzt oder in den 6 Stunden davor) oder Reif (Frost + Luftfeuchte ab 92 % bei klarem Himmel, Nebelreif ab 97 %).</p>
       <p><b>Schnee:</b> Hinweg = Neuschnee der 6 Stunden davor, Heimweg = Neuschnee seit der Hinfahrt (ganze Schicht).</p>
+      <p><b>Schichtsystem</b> und Zeiten stellst du in den Einstellungen ein, z. B. „1 1 2 2 3 3 f f f f“ mit 1 = 6–14, 2 = 14–22, 3 = 22–6. Früh/Spät/Nacht ergibt sich aus der Beginnzeit.</p>
       <p><b>Freie Tage:</b> Hinfahrt um 5, Rückfahrt um 16 Uhr (einstellbar).</p>
       <p>Quellen: GeoSphere Austria (Modell, Ensemble, Radar-Hochrechnung), DWD ICON-D2-Ensemble, ab ca. Tag 3 ECMWF-Ensemble (Open-Meteo). „Trend“ = noch unsicher.</p>
     </details>
@@ -231,9 +233,20 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
     </fieldset>
 
     <fieldset>
-      <legend>Schicht &amp; Ort</legend>
-      <label for="cycleStart">Erster Frühdienst (6–14) des Schichtrads</label>
+      <legend>Schichtsystem</legend>
+      <label for="cycle">System (Zahl = Schicht, f = frei)</label>
+      <input id="cycle" placeholder="1 1 2 2 3 3 f f f f" autocapitalize="off" autocorrect="off">
+      <div class="hint">Ein Eintrag pro Tag, das System wiederholt sich.</div>
+      <div class="lvl">Schicht 1 <input id="t1" placeholder="6-14" style="width:110px"></div>
+      <div class="lvl">Schicht 2 <input id="t2" placeholder="14-22" style="width:110px"></div>
+      <div class="lvl">Schicht 3 <input id="t3" placeholder="22-6" style="width:110px"></div>
+      <div class="lvl">Schicht 4 <input id="t4" placeholder="optional" style="width:110px"></div>
+      <label for="cycleStart">Tag 1 des Systems (erster Eintrag)</label>
       <input id="cycleStart" type="date">
+    </fieldset>
+
+    <fieldset>
+      <legend>Freie Tage &amp; Ort</legend>
       <label>Freie Tage: Hinfahrt und Rückfahrt (Uhr)</label>
       <div class="row">
         <input id="freeOut" inputmode="decimal" placeholder="5">

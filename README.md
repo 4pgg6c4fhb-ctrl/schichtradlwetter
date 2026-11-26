@@ -1,7 +1,7 @@
-# Schichtradlwetter
+# SchichtRADWETTER
 
 Persönliche Wetter-App (PWA) fürs Radfahren zur Arbeit in Wörgl (Tirol), passend zum
-10-Tage-Schichtrad (2× Früh 6–14, 2× Spät 14–22, 2× Nacht 22–6, 4 Tage frei).
+eigenen Schichtsystem (einstellbar, Standard: `1 1 2 2 3 3 f f f f` mit 1 = 6–14, 2 = 14–22, 3 = 22–6).
 
 Eine Seite:
 

@@ -7,7 +7,9 @@ const $ = (id) => document.getElementById(id);
 const SETTINGS_VERSION = 2;
 const DEFAULTS = {
   fixLat: '47.4894', fixLon: '12.0620', placeName: 'Wörgl',
-  cycleStart: '2026-11-24',   // erster Frühdienst eines Schichtrads
+  cycle: '1 1 2 2 3 3 f f f f', // Schichtsystem: Nummer = Schicht, f = frei
+  t1: '6-14', t2: '14-22', t3: '22-6', t4: '',   // Zeiten der Schichten 1–4
+  cycleStart: '2026-11-24',   // Tag 1 des Systems (erster Eintrag)
   freeOut: '5', freeBack: '16', // freie Tage: Hinfahrt / Rückfahrt (Uhr)
   heavyMm: '0.5',             // mehr als Tröpfeln
   snowCm: '1',
@@ -54,26 +56,56 @@ function getPosition() {
 }
 
 // ---------- Schichtrad ----------
-// 10-Tage-Rad: 2× Früh, 2× Spät, 2× Nacht, 4 Tage frei.
-const EARLY = { name: 'Früh', icon: 'sunrise', cls: 'early', s: 6, len: 8 };
-const LATE = { name: 'Spät', icon: 'sunset', cls: 'late', s: 14, len: 8 };
-const NIGHT = { name: 'Nacht', icon: 'moon', cls: 'night', s: 22, len: 8 };
-const CYCLE = [EARLY, EARLY, LATE, LATE, NIGHT, NIGHT, null, null, null, null];
+// Schichtsystem aus den Einstellungen, z. B. "1 1 2 2 3 3 f f f f" mit Zeiten "6-14", "14-22", "22-6".
 const DAY = 86400e3;
 const SNOW_BEFORE_H = 6;   // Hinweg: Neuschnee der letzten 6 Stunden zählt
 
+// "6-14", "6:30 - 14:30", "22–6" → { s: 6, len: 8 }
+function parseSpan(str) {
+  const m = String(str || '').match(/(\d{1,2})(?:[:.](\d{2}))?\s*[-–bis ]+\s*(\d{1,2})(?:[:.](\d{2}))?/);
+  if (!m) return null;
+  const from = +m[1] + (+m[2] || 0) / 60, to = +m[3] + (+m[4] || 0) / 60;
+  if (from > 24 || to > 24) return null;
+  return { s: from, len: ((to - from + 24) % 24) || 24 };
+}
+// Anzeige-Art nach Beginnzeit
+function shiftKind(start) {
+  if (start >= 3 && start < 11) return { name: 'Früh', icon: 'sunrise', cls: 'early' };
+  if (start >= 11 && start < 19) return { name: 'Spät', icon: 'sunset', cls: 'late' };
+  return { name: 'Nacht', icon: 'moon', cls: 'night' };
+}
+let cycleCache = { key: '', list: [] };
+function getCycle(s) {
+  const key = [s.cycle, s.t1, s.t2, s.t3, s.t4].join('|');
+  if (cycleCache.key === key) return cycleCache.list;
+  const list = String(s.cycle || '').trim().split(/[\s,;]+/).filter(Boolean).map((tok) => {
+    const n = parseInt(tok, 10);
+    const span = n >= 1 && n <= 4 ? parseSpan(s['t' + n]) : null;
+    return span ? Object.assign({ key: n }, shiftKind(span.s), span) : null;   // f, -, x … = frei
+  });
+  cycleCache = { key, list };
+  return list;
+}
 function parseDate(str) {
   const [y, m, d] = String(str).split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
-function shiftFor(date, cycleStart) {
-  const diff = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - parseDate(cycleStart)) / DAY);
-  return CYCLE[((diff % CYCLE.length) + CYCLE.length) % CYCLE.length];
+function shiftFor(date, s) {
+  const cyc = getCycle(s);
+  if (!cyc.length) return null;
+  const diff = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - parseDate(s.cycleStart)) / DAY);
+  return cyc[((diff % cyc.length) + cyc.length) % cyc.length];
 }
-function shiftOrdinal(d, s) {
-  const sh = shiftFor(d, s.cycleStart);
-  const prev = shiftFor(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1), s.cycleStart);
-  return `${prev === sh ? 'zweiten' : 'ersten'} ${sh.name}schicht`;
+// Wievielte gleiche Schicht in Folge (1., 2., …)
+function shiftNumber(d, s) {
+  const sh = shiftFor(d, s);
+  let n = 1;
+  for (let k = 1; k < 30; k++) {
+    const p = shiftFor(new Date(d.getFullYear(), d.getMonth(), d.getDate() - k), s);
+    if (!p || p.key !== sh.key) break;
+    n++;
+  }
+  return n;
 }
 
 // Alle Schichten (gestern bis +10 Tage) mit bewerteten Fahrten.
@@ -82,18 +114,20 @@ function planShifts(hours, data, s, p) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = Date.now();
   const items = [];
-  const ride = (name, key, snowFrom, snowTo) => {
-    if (key <= now) return null;
-    const h = byT.get(key);
+  const ride = (name, endT, snowFrom, snowTo) => {
+    if (endT <= now) return null;
+    // Wetterdaten sind stündlich: nächstliegende volle Stunde verwenden (z. B. 7:30 → Stunde bis 8:00)
+    const key = Math.round(endT / HOUR) * HOUR;
+    const h = byT.get(key) || byT.get(key + HOUR);
     const snow = snowRisk(snowFrom, snowTo, data, p.snowCm);
     const prev = [];
     for (let t = key - 6 * HOUR; t < key; t += HOUR) if (byT.has(t)) prev.push(byT.get(t));
-    return { name, from: key - HOUR, to: key, h, a: h ? assessRide([h], snow, p, prev) : null };
+    return { name, from: endT - HOUR, to: endT, h, a: h ? assessRide([h], snow, p, prev) : null };
   };
   const at = (d, hour) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(hour), Math.round((hour % 1) * 60)).getTime();
   for (let i = -1; i <= 10; i++) {
     const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-    let sh = shiftFor(d, s.cycleStart);
+    let sh = shiftFor(d, s);
     let start, end, out, back;
     if (sh) {
       start = at(d, sh.s);
@@ -149,7 +183,7 @@ const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${
 const wdFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short' });
 const shortDayFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short', day: 'numeric', month: 'numeric' });
 const timeFmt = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-digit' });
-const hr = (t) => String(new Date(t).getHours());
+const hr = (t) => { const d = new Date(t); return d.getMinutes() ? `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` : String(d.getHours()); };
 const VERDICT = { ok: 'Fahren', warn: 'Aufpassen', stop: 'Nicht fahren' };
 const esc = (x) => String(x).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 const deg = (x) => (isNum(x) ? `${fmt0(x)}°` : '–');
@@ -203,7 +237,7 @@ function renderSummary(items, s) {
   for (const it of items) {
     if (!it.rides.length) continue;
     if (it.rides.some((r) => !r.a)) { notes.none++; if (!it.rides.some((r) => r.a)) continue; }
-    const who = it.sh.free ? `${dayLabel(it.i, it.d)} · frei` : `${dayLabel(it.i, it.d)} · ${shiftOrdinal(it.d, s).startsWith('zweiten') ? '2.' : '1.'} ${it.sh.name}schicht`;
+    const who = it.sh.free ? `${dayLabel(it.i, it.d)} · frei` : `${dayLabel(it.i, it.d)} · ${shiftNumber(it.d, s)}. ${it.sh.name}schicht`;
     const where = (pred) => {
       const n = it.rides.filter((r) => r.a && pred(r.a)).map((r) => r.name);
       return n.length === 2 ? 'Hin- und Heimweg' : n[0];
@@ -249,7 +283,7 @@ function renderShifts(items) {
     const trend = it.rides.some((r) => r.a?.trend);
     const title = it.sh.free
       ? `Frei <small>Hin ${fmtH(it.sh.out)} · zurück ${fmtH(it.sh.back)} Uhr</small>`
-      : `${it.sh.name}schicht <small>${it.sh.s}–${(it.sh.s + it.sh.len) % 24} Uhr</small>`;
+      : `${it.sh.name}schicht <small>${fmtH(it.sh.s)}–${fmtH((it.sh.s + it.sh.len) % 24)} Uhr</small>`;
     return `<div class="shift">
       <div class="date${it.i === 0 ? ' today' : ''}"><div class="wd">${it.i === 0 ? 'Heute' : wdFmt.format(it.d)}</div><div class="d">${it.d.getDate()}</div></div>
       <div>

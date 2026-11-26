@@ -1,6 +1,6 @@
 {
-  "name": "Schichtradlwetter",
-  "short_name": "Schichtradl",
+  "name": "SchichtRADWETTER",
+  "short_name": "RADWETTER",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
