@@ -117,12 +117,12 @@ details p, details li { font-size: 13px; color: var(--muted); }
       <summary>Wie wird die Wahrscheinlichkeit berechnet?</summary>
       <p>Gemeint ist die Wahrscheinlichkeit für mindestens <b>0,1 mm Niederschlag</b> in der jeweiligen Stunde an deinem Standort.</p>
       <ul>
-        <li><b>GeoSphere Ensemble</b> (C-LAEF, 1 km): aus dem 10., 50. und 90. Perzentil wird abgeschätzt, wie viele Ensemble-Läufe über 0,1 mm liegen. Gewicht 50 %.</li>
-        <li><b>GeoSphere Hauptlauf</b> (AROME, 1 km): Menge → weicher Ja/Nein-Wert. Gewicht 20 %.</li>
-        <li><b>Kachelmannwetter</b> (Super-HD-Modellmix): Menge → weicher Ja/Nein-Wert. Gewicht 30 %.</li>
+        <li><b>GeoSphere-Ensemble</b> (C-LAEF, 1 km): aus dem 10., 50. und 90. Perzentil wird abgeschätzt, wie viele Läufe über 0,1 mm liegen. Gewicht 40 %.</li>
+        <li><b>DWD ICON-D2-Ensemble</b> (20 Läufe, 2 km, über Open-Meteo): Anteil der Läufe mit Regen, exakt ausgezählt. Gewicht 40 %.</li>
+        <li><b>GeoSphere-Hauptlauf</b> (AROME, 1 km): Menge → weicher Ja/Nein-Wert. Gewicht 20 %.</li>
         <li><b>GeoSphere Nowcast</b> (Radar-Hochrechnung): dominiert die ersten 3 Stunden und verliert dann linear an Gewicht.</li>
       </ul>
-      <p>Fehlt eine Quelle, werden die Gewichte der übrigen hochgerechnet. Temperatur = Mittel aus GeoSphere und Kachelmann; die Spanne darunter ist das 10.–90. Perzentil des Ensembles.</p>
+      <p>Fehlt eine Quelle, werden die Gewichte der übrigen hochgerechnet. Temperatur = Mittel aus GeoSphere und ICON-D2; die Spanne darunter ist das 10.–90. Perzentil des Ensembles.</p>
     </details>
   </section>
 </main>
@@ -130,9 +130,6 @@ details p, details li { font-size: 13px; color: var(--muted); }
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
     <h2>Einstellungen</h2>
-    <label for="kmwKey">Kachelmannwetter API-Key <span class="muted">(Plus-Abo nötig, wird nur auf diesem Gerät gespeichert)</span></label>
-    <input id="kmwKey" type="password" autocomplete="off" placeholder="leer = nur GeoSphere">
-    <p class="muted">Key erstellen: accounts.meteologix.com → Abos → „API-Keys verwalten“. Beim Hobby-Tarif muss dein Standort dort auch als API-Standort eingetragen sein.</p>
     <label>Fester Standort <span class="muted">(leer = GPS)</span></label>
     <div class="row">
       <input id="fixLat" inputmode="decimal" placeholder="Breite, z. B. 48.208">

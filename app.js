@@ -2,9 +2,9 @@
 
 // ---------- Konfiguration ----------
 const GS = 'https://dataset.api.hub.geosphere.at/v1/timeseries/forecast';
-const KMW = 'https://api.kachelmannwetter.com/v02';
+const OM = 'https://ensemble-api.open-meteo.com/v1/ensemble';
 const THRESHOLD_MM = 0.1;            // "es regnet" ab 0,1 mm pro Stunde
-const WEIGHTS = { ens: 0.5, nwp: 0.2, kmw: 0.3 };
+const WEIGHTS = { ens: 0.4, nwp: 0.2, om: 0.4 };
 const NOWCAST_HOURS = 3;             // Nowcast-Einfluss klingt bis hierhin linear aus
 const HOURS_SHOWN = 48;
 const HOUR = 3600e3;
@@ -23,7 +23,7 @@ function load(key, fallback = null) {
 }
 
 function settings() {
-  return Object.assign({ kmwKey: '', fixLat: '', fixLon: '', placeName: '' }, load('settings', {}));
+  return Object.assign({ fixLat: '', fixLon: '', placeName: '' }, load('settings', {}));
 }
 
 async function cachedJson(cacheKey, ttlMs, url, opts) {
@@ -98,20 +98,34 @@ async function fetchGeoSphere(lat, lon) {
   return { res, errors };
 }
 
-async function fetchKachelmann(lat, lon, key) {
-  if (!key) return { skipped: true };
-  const url = `${KMW}/forecast/${lat.toFixed(4)}/${lon.toFixed(4)}/standard/1h?units=metric`;
+// Open-Meteo Ensemble (DWD ICON-D2-EPS, 20 Läufe, 2 km): kostenlos, ohne Key.
+// Pro Stunde: Anteil der Läufe mit >= 0,1 mm = Wahrscheinlichkeit; Median-Menge; Mittelwerte für Rest.
+async function fetchOpenMeteo(lat, lon) {
+  const vars = ['precipitation', 'temperature_2m', 'cloud_cover', 'wind_speed_10m', 'wind_gusts_10m'];
+  const url = `${OM}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=${vars.join(',')}` +
+    '&models=icon_d2_eps&forecast_days=3&timezone=GMT&wind_speed_unit=ms';
   try {
-    const json = await cachedJson(`kmw-${lat.toFixed(3)},${lon.toFixed(3)}`, 30 * 60e3, url,
-      { headers: { 'X-API-Key': key, Accept: 'application/json' } });
+    const json = await cachedJson(`om-${lat.toFixed(3)},${lon.toFixed(3)}`, 15 * 60e3, url);
+    if (json.error) throw new Error(json.reason || 'Fehler');
+    const h = json.hourly || {};
+    const members = (name) => Object.keys(h).filter((k) => k === name || k.startsWith(name + '_member'));
+    const pk = members('precipitation');
     const rows = new Map();
-    for (const d of Object.values(json.data || {})) rows.set(Date.parse(d.dateTime), d);
-    return { rows, ref: json.run };
+    (h.time || []).forEach((t, i) => {
+      const prec = pk.map((k) => h[k][i]).filter(isNum).sort((a, b) => a - b);
+      if (!prec.length) return;
+      const at = (name) => avg(members(name).map((k) => h[k][i]));
+      rows.set(Date.parse(t + 'Z'), {
+        prob: 100 * prec.filter((x) => x >= THRESHOLD_MM).length / prec.length,
+        n: prec.length,
+        mm: prec[Math.floor(prec.length / 2)],
+        temp: at('temperature_2m'), cloud: at('cloud_cover'), wind: at('wind_speed_10m'), gust: at('wind_gusts_10m'),
+      });
+    });
+    if (!rows.size) throw new Error('keine Daten für diesen Ort');
+    return { rows };
   } catch (e) {
-    const hint = e.status === 401 ? 'API-Key ungültig'
-      : e.status === 403 ? 'Standort nicht im Abo freigeschaltet'
-      : e.status === 429 ? 'Tageslimit erreicht' : e.message;
-    return { error: hint };
+    return { error: e.status === 429 ? 'Tageslimit erreicht, später erneut' : e.message };
   }
 }
 
@@ -169,12 +183,12 @@ function symbol(h) {
 }
 
 // ---------- Zusammenführen ----------
-function buildHours(pos, gs, kmw) {
+function buildHours(pos, gs, om) {
   const now = Date.now();
   const startHour = Math.ceil(now / HOUR) * HOUR;                 // nächste volle Stunde (Ende der laufenden Stunde)
   const nwp = gs.res.nwp?.rows || new Map();
   const ens = gs.res.ens?.rows || new Map();
-  const kr = kmw.rows || new Map();
+  const omr = om.rows || new Map();
 
   // Nowcast (15-min-Summen, Intervall endet am Zeitstempel) auf Stunden aufsummieren.
   const nowHourly = new Map();
@@ -189,35 +203,35 @@ function buildHours(pos, gs, kmw) {
   const hours = [];
   for (let i = 0; i < HOURS_SHOWN; i++) {
     const t = startHour + i * HOUR;
-    const n = nwp.get(t) || {}, e = ens.get(t) || {}, k = kr.get(t) || {};
+    const n = nwp.get(t) || {}, e = ens.get(t) || {}, o = omr.get(t) || {};
     const nc = nowHourly.get(t);
     const nowcastMm = nc && nc.n >= 3 ? nc.mm * 4 / nc.n : null;   // auf volle Stunde hochrechnen, falls unvollständig
 
     const pEns = probFromPercentiles(e.tp_p10, e.tp_p50, e.tp_p90);
     const pNwp = probFromAmount(n.tp);
-    const pKmw = probFromAmount(k.precCurrent);
+    const pOm = isNum(o.prob) ? o.prob : null;
     const pNc = probFromAmount(nowcastMm);
     const lead = (t - now) / HOUR;
     const wNc = isNum(pNc) ? clamp(1 - (lead - 1) / NOWCAST_HOURS, 0, 1) * 0.7 : 0;
 
-    const pModels = combine([{ p: pEns, w: WEIGHTS.ens }, { p: pNwp, w: WEIGHTS.nwp }, { p: pKmw, w: WEIGHTS.kmw }]);
+    const pModels = combine([{ p: pEns, w: WEIGHTS.ens }, { p: pNwp, w: WEIGHTS.nwp }, { p: pOm, w: WEIGHTS.om }]);
     const prob = combine([{ p: pModels, w: isNum(pModels) ? 1 - wNc : 0 }, { p: pNc, w: wNc }]);
 
-    const mmModels = avg([n.tp, k.precCurrent, e.tp_p50]);
+    const mmModels = avg([n.tp, o.mm, e.tp_p50]);
     const mm = wNc && isNum(nowcastMm) ? wNc * nowcastMm + (1 - wNc) * (mmModels ?? nowcastMm) : mmModels;
 
-    const temp = avg([n['2t'], k.temp, nc ? avg(nc.t2m) : null]);
+    const temp = avg([n['2t'], o.temp, nc ? avg(nc.t2m) : null]);
     const windN = isNum(n['10u']) && isNum(n['10v']) ? Math.hypot(n['10u'], n['10v']) : null;
-    const wind = avg([windN, k.windSpeed]);
-    const gust = avg([n['10fg'], k.windGust]);
-    const cloud = avg([n.tcc, k.cloudCoverage]);
+    const wind = avg([windN, o.wind]);
+    const gust = avg([n['10fg'], o.gust]);
+    const cloud = avg([n.tcc, o.cloud]);
     const snow = isNum(n.sf) && isNum(n.rain) ? n.sf > n.rain : (isNum(temp) && temp < 0.5);
     const day = sunUp(new Date(t - HOUR / 2), pos.lat, pos.lon);
 
     const h = {
       t, prob, mm, temp, wind, gust, cloud, snow, day,
       tLo: e['2t_p10'], tHi: e['2t_p90'],
-      src: { pEns, pNwp, pKmw, pNc, wNc, nwpMm: n.tp, kmwMm: k.precCurrent, ens: [e.tp_p10, e.tp_p50, e.tp_p90], nowcastMm },
+      src: { pEns, pNwp, pOm, omN: o.n, pNc, wNc, nwpMm: n.tp, omMm: o.mm, ens: [e.tp_p10, e.tp_p50, e.tp_p90], nowcastMm },
     };
     [h.icon, h.desc] = symbol(h);
     if ([prob, temp, cloud].some(isNum)) hours.push(h);
@@ -299,7 +313,7 @@ function renderHours(hours) {
       isNum(s.pNc) ? `Nowcast ${fmt0(s.pNc)} % (${fmt1(s.nowcastMm)} mm, Gewicht ${fmt0(s.wNc * 100)} %)` : null,
       isNum(s.pEns) ? `Ensemble ${fmt0(s.pEns)} % (P10/50/90: ${s.ens.map(fmt1).join(' / ')} mm)` : 'Ensemble –',
       isNum(s.pNwp) ? `GeoSphere ${fmt0(s.pNwp)} % (${fmt1(s.nwpMm)} mm)` : 'GeoSphere –',
-      isNum(s.pKmw) ? `Kachelmann ${fmt0(s.pKmw)} % (${fmt1(s.kmwMm)} mm)` : 'Kachelmann –',
+      isNum(s.pOm) ? `ICON-D2 ${fmt0(s.pOm)} % (${Math.round(s.pOm * s.omN / 100)} von ${s.omN} Läufen, Median ${fmt1(s.omMm)} mm)` : 'ICON-D2 –',
     ].filter(Boolean);
     html.push(`<tr class="h" data-t="${h.t}">
       <td class="t">${timeFmt.format(d)}</td>
@@ -335,18 +349,17 @@ async function run() {
     $('place').textContent = `${name} · ${pos.lat.toFixed(3)}, ${pos.lon.toFixed(3)}` +
       (pos.acc ? ` (±${Math.round(pos.acc)} m)` : '') + (pos.stale ? ' · letzter bekannter' : '');
 
-    setStatus(['Lade GeoSphere' + (s.kmwKey ? ' und Kachelmannwetter' : '') + ' …']);
-    const [gs, kmw] = await Promise.all([fetchGeoSphere(pos.lat, pos.lon), fetchKachelmann(pos.lat, pos.lon, s.kmwKey)]);
-    const hours = buildHours(pos, gs, kmw);
+    setStatus(['Lade GeoSphere und Open-Meteo …']);
+    const [gs, om] = await Promise.all([fetchGeoSphere(pos.lat, pos.lon), fetchOpenMeteo(pos.lat, pos.lon)]);
+    const hours = buildHours(pos, gs, om);
 
     const names = { nwp: 'GeoSphere-Modell', ens: 'GeoSphere-Ensemble', now: 'Nowcast' };
     const msgs = [];
     const ok = Object.keys(gs.res).map((k) => names[k]);
-    if (kmw.rows) ok.push('Kachelmann');
+    if (om.rows) ok.push('ICON-D2-Ensemble');
     msgs.push(`Stand ${timeFmt.format(new Date())} · Quellen: ${ok.join(', ') || 'keine'}`);
     for (const [k, e] of Object.entries(gs.errors)) msgs.push(`<span class="warn">${names[k]}: ${e}</span>`);
-    if (kmw.error) msgs.push(`<span class="warn">Kachelmann: ${kmw.error}</span>`);
-    if (kmw.skipped) msgs.push('Kachelmann aus – API-Key unter ⚙︎ eintragen');
+    if (om.error) msgs.push(`<span class="warn">Open-Meteo: ${om.error}</span>`);
 
     if (!hours.length) throw new Error('Keine Vorhersagedaten für diesen Ort (GeoSphere deckt Mitteleuropa ab).');
     renderNow(hours);
@@ -364,24 +377,20 @@ async function run() {
 // ---------- Einstellungen ----------
 $('btnSettings').addEventListener('click', () => {
   const s = settings();
-  $('kmwKey').value = s.kmwKey; $('fixLat').value = s.fixLat; $('fixLon').value = s.fixLon; $('placeName').value = s.placeName;
+  $('fixLat').value = s.fixLat; $('fixLon').value = s.fixLon; $('placeName').value = s.placeName;
   $('settings').showModal();
 });
 $('settings').addEventListener('close', () => {
   if ($('settings').returnValue !== 'save') return;
-  const prev = settings();
-  const next = {
-    kmwKey: $('kmwKey').value.trim(), fixLat: $('fixLat').value.trim(),
+    const next = {
+    fixLat: $('fixLat').value.trim(),
     fixLon: $('fixLon').value.trim(), placeName: $('placeName').value.trim(),
   };
   store('settings', next);
-  if (prev.kmwKey !== next.kmwKey) {
-    try { Object.keys(localStorage).filter((k) => k.startsWith('kmw-')).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
-  }
   run();
 });
 $('btnReload').addEventListener('click', () => {
-  try { Object.keys(localStorage).filter((k) => /^(gs-|kmw-)/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
+  try { Object.keys(localStorage).filter((k) => /^(gs-|om-)/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
   run();
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) run(); });
