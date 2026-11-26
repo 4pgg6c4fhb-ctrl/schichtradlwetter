@@ -257,13 +257,14 @@ function rideFeel(temp, windMs) {
   return 13.12 + 0.6215 * temp - 11.37 * p + 0.3965 * temp * p;
 }
 
-// Kleidung + Warnungen für eine Liste von Stunden.
-// items/warnings: [Symbol, Text, Stufe 0–3] – Stufe wird als Punkte unter dem Symbol gezeigt.
+// Kleidung + Warnungen für eine Liste von Stunden (vereinfacht: Handschuhe+Kappe ja/nein, oben und Hose dick/dünn).
+const COLD_HANDS = 10;   // gefühlt am Rad unter 10 °C → Handschuhe + Kappe
+const COLD_BODY = 5;     // gefühlt am Rad unter 5 °C → dicke Jacke und dicke Hose
 function clothing(hours) {
   const hs = hours.filter((h) => isNum(h.temp));
   if (!hs.length) return null;
   const feels = hs.map((h) => h.feel ?? rideFeel(h.temp, h.wind)).filter(isNum);
-  const fMin = Math.min(...feels), fMax = Math.max(...feels);
+  const fMin = Math.min(...feels);
   const tMin = Math.min(...hs.map((h) => h.temp)), tMax = Math.max(...hs.map((h) => h.temp));
   const max = (k) => { const v = hs.map((h) => h[k]).filter(isNum); return v.length ? Math.max(...v) : null; };
   const pMax = max('prob') ?? 0;
@@ -271,52 +272,31 @@ function clothing(hours) {
   const mmSum = hs.reduce((s, h) => s + (isNum(h.mm) ? h.mm : 0), 0);
   const gustKmh = isNum(max('gust')) ? max('gust') * 3.6 : null;
   const snowy = hs.some((h) => h.snow && (h.prob ?? 0) >= 30);
-  const dark = hs.some((h) => !h.day);
+  const ice = tMin <= 1 && (pMax >= 30 || snowy);
+  const storm = isNum(gustKmh) && gustKmh >= 60;
 
-  const items = [];
-  // Hände
-  if (fMin < -8) items.push(['🧤', 'Dicke Winterhandschuhe (Lobster/Fäustlinge)', 3]);
-  else if (fMin < 2) items.push(['🧤', 'Winterhandschuhe', 2]);
-  else if (fMin < 10) items.push(['🧤', 'Dünne Langfinger-Handschuhe', 1]);
-  // Kopf / Hals
-  if (fMin < -8) items.push(['🧣', 'Sturmhaube oder Mütze + Buff', 3]);
-  else if (fMin < 2) items.push(['🧣', 'Mütze unter dem Helm + Buff', 2]);
-  else if (fMin < 8) items.push(['🧣', 'Stirnband / Ohrenschutz', 1]);
-  // Oberkörper
-  if (fMin < 3) items.push(['🧥', 'Winterjacke (winddicht) + warme Unterschicht', 3]);
-  else if (fMin < 10) items.push(['🧥', 'Softshell- oder Thermojacke', 2]);
-  else if (fMin < 16) items.push(['🧥', 'Langarm + Windweste', 1]);
-  else if (fMin < 21) items.push(['👕', 'Kurzarm + Armlinge', 1]);
-  else items.push(['👕', 'Kurzarm', 0]);
-  // Beine
-  if (fMin < 5) items.push(['👖', 'Lange Thermohose', 3]);
-  else if (fMin < 14) items.push(['👖', 'Lange Hose / Beinlinge', 2]);
-  else if (fMin < 18) items.push(['🩳', 'Knielinge oder kurze Hose', 1]);
-  else items.push(['🩳', 'Kurze Hose', 0]);
-  // Füße
-  if (fMin < 0) items.push(['🥾', 'Winterschuhe oder Neopren-Überschuhe + warme Socken', 3]);
-  else if (fMin < 6) items.push(['🧦', 'Überschuhe / warme Socken', 2]);
-  // Regen
-  if (pMax >= 60 || mmSum >= 1) items.push(['☔', 'Regenjacke + Regenhose anziehen' + (fMin < 10 ? ' + wasserdichte Überschuhe' : ''), 3]);
-  else if (pMax >= 30) items.push(['🌂', 'Regenjacke einpacken', 1]);
-  // Licht
-  if (dark) items.push(['🔦', 'Licht + Reflektoren (Dunkelheit)', 0]);
-  // Zwiebelprinzip
-  if (fMax - fMin >= 8) items.push(['🧅', `Zwiebelprinzip: ${fmt0(tMin)}° bis ${fmt0(tMax)}°, Schicht zum Ausziehen`, 0]);
+  const gloves = fMin < COLD_HANDS;
+  const top = fMin < COLD_BODY ? 'dick' : 'dünn';
+  const pants = fMin < COLD_BODY ? 'dick' : 'dünn';
+  const rain = pMax >= 60 || mmSum >= 1 ? 'anziehen' : pMax >= 30 ? 'einpacken' : null;
 
   const warnings = [];
-  const ice = tMin <= 1 && (pMax >= 30 || snowy);
-  if (pHeavy >= 25) warnings.push(['🌧️', `Starkregen ${fmt0(pHeavy)} %`, 0]);
-  if (ice) warnings.push(['🧊', 'Glättegefahr', 0]);
-  if (snowy) warnings.push(['❄️', 'Schneefall möglich', 0]);
-  if (isNum(gustKmh) && gustKmh >= 35) warnings.push(['💨', `Böen bis ${fmt0(gustKmh)} km/h`, 0]);
+  if (pHeavy >= 25) warnings.push(`Starkregen möglich (${fmt0(pHeavy)} %)`);
+  if (ice) warnings.push('Glättegefahr');
+  if (snowy) warnings.push('Schneefall möglich');
+  if (isNum(gustKmh) && gustKmh >= 45) warnings.push(`Böen bis ${fmt0(gustKmh)} km/h`);
 
-  // Ampel: fahren / aufpassen / nicht fahren
+  // Ampel: fahren / aufpassen / nicht fahren (nur Starkregen verbietet das Fahren)
   let verdict = 'ok';
-  if (pHeavy >= 25 || ice || (isNum(gustKmh) && gustKmh >= 60) || (snowy && pMax >= 50)) verdict = 'warn';
+  if (pHeavy >= 25 || ice || storm || (snowy && pMax >= 50)) verdict = 'warn';
   if (pHeavy >= 50) verdict = 'stop';
 
-  const summary = `${fmt0(tMin)}° bis ${fmt0(tMax)}°, gefühlt am Rad ${fmt0(fMin)}°, Regen max. ${fmt0(pMax)} %` +
-    (mmSum >= 0.1 ? `, ${fmt1(mmSum)} mm` : '');
-  return { items, warnings, verdict, summary, tMin, tMax, fMin, pMax, pHeavy, mmSum, range: hs.some((h) => h.range === 'lang') ? 'lang' : 'kurz' };
+  return { gloves, top, pants, rain, warnings, verdict, tMin, tMax, fMin, pMax, pHeavy, mmSum, ice, snowy, storm,
+    range: hs.some((h) => h.range === 'lang') ? 'lang' : 'kurz' };
+}
+
+// Kurzer Kleidungstext, z. B. "Handschuhe + Kappe · Jacke dick · Hose dick · Regenzeug einpacken"
+function clothingText(c) {
+  return [c.gloves ? 'Handschuhe + Kappe' : 'ohne Handschuhe', `Jacke ${c.top}`, `Hose ${c.pants}`,
+    c.rain ? `Regenzeug ${c.rain}` : null].filter(Boolean).join(' · ');
 }

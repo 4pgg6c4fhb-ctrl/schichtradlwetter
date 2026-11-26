@@ -61,17 +61,11 @@ header h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.3px;
 .status .err { color: var(--red); }
 .status .warn { color: var(--amber); }
 
-/* Symbol-Kacheln (Kleidung) */
-.tiles { display: flex; flex-wrap: wrap; gap: 8px; }
-.tile { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; min-width: 44px; }
-.tile .circ { width: 44px; height: 44px; font-size: 22px; }
-.tile i { font-style: normal; font-size: 9px; letter-spacing: 1.5px; color: var(--cyan); line-height: 1; height: 9px; }
-.tile small { display: none; font-size: 11px; color: var(--muted); max-width: 92px; text-align: center; line-height: 1.2; }
-.tile.warn .circ { background: color-mix(in srgb, var(--amber) 28%, transparent); }
-.show-text .tile small { display: block; }
-.tiles.sm { gap: 5px; }
-.tiles.sm .tile { min-width: 34px; }
-.tiles.sm .tile .circ { width: 34px; height: 34px; font-size: 17px; }
+/* Kleidung als Text */
+.krow { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.krow:first-child { border-top: 0; }
+.krow b { font-weight: 700; }
+.krow.warn { color: var(--amber); font-weight: 600; }
 
 /* Stündliche Leiste */
 .strip { display: flex; overflow-x: auto; gap: 2px; padding-bottom: 6px; scrollbar-width: none; }
@@ -107,9 +101,17 @@ header h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.3px;
 .ride { margin: 8px 0 4px 52px; padding: 8px 10px; background: var(--card2); border-radius: 10px; border-left: 3px solid var(--green); }
 .ride.warn { border-left-color: var(--amber); }
 .ride.stop { border-left-color: var(--red); }
-.ride-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.ride-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 3px; font-variant-numeric: tabular-nums; }
 .ride-top .lbl { color: var(--muted); font-size: 13px; min-width: 52px; }
-.ride-top .big { font-size: 18px; font-weight: 700; }
+.ride-info { font-size: 14px; }
+.ride-info .w { color: var(--amber); }
+.ride-cloth { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.ride-top .v { font-size: 13px; font-weight: 600; }
+.ride.ok .v { color: var(--green); } .ride.warn .v { color: var(--amber); } .ride.stop .v { color: var(--red); }
+.sum { margin: 6px 0; font-size: 15px; line-height: 1.4; }
+.sum.ok b { color: var(--green); }
+.sum.stop { color: var(--red); }
+.sum.warn { color: var(--amber); }
 .ride-top .v { margin-left: auto; }
 .ride.none { border-left-color: var(--line); color: var(--muted); font-size: 13px; }
 .free { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
@@ -186,10 +188,9 @@ details p, details li { font-size: 13px; color: var(--muted); }
     </div>
     <div class="status" id="status"></div>
 
-    <section class="card tap-text" id="clothCard" hidden>
+    <section class="card" id="clothCard" hidden>
       <div class="card-title">Radkleidung nächste 12 h <span class="sub" id="clothSummary"></span></div>
-      <div class="tiles" id="clothList"></div>
-      <div class="hint">Antippen für Text · Punkte = dicker</div>
+      <div id="clothList"></div>
     </section>
 
     <section class="card">
@@ -208,12 +209,12 @@ details p, details li { font-size: 13px; color: var(--muted); }
   <!-- ===== SCHICHTEN ===== -->
   <div data-view="schichten" hidden>
     <section class="card">
-      <div class="card-title">Wetterprobleme</div>
-      <div class="chips" id="shiftSummary"></div>
+      <div class="card-title">Schichtrad</div>
+      <div id="shiftSummary"></div>
     </section>
-    <section class="card tap-text">
+    <section class="card">
       <div id="shifts"></div>
-      <div class="hint">✅ fahren · ⚠️ aufpassen · 🚫 nicht fahren · 🚲 gefühlt am Rad · antippen für Text</div>
+      <div class="hint">✅ fahren · ⚠️ aufpassen · 🚫 nicht fahren (zu viel Regen) · gefühlt = Temperatur am Rad mit Fahrtwind</div>
     </section>
   </div>
 
@@ -234,7 +235,7 @@ details p, details li { font-size: 13px; color: var(--muted); }
           <li><b>GeoSphere-Radar-Hochrechnung</b>: dominiert die ersten 3 Stunden.</li>
           <li><b>ECMWF-Ensemble</b> (51 Läufe, Open-Meteo): ab etwa Tag 3, als „≈ Trend“ markiert.</li>
         </ul>
-        <p><b>🚲 Gefühlt am Rad</b>: Windchill mit Wind + 20 km/h Fahrtwind.</p>
+        <p><b>Gefühlt am Rad</b>: Windchill mit Wind + 20 km/h Fahrtwind. Handschuhe + Kappe unter 10 °C gefühlt, dicke Jacke und Hose unter 5 °C gefühlt.</p>
         <p><b>🚫 Nicht fahren</b>: mindestens die Hälfte der Läufe bringt mehr Regen als deine Grenze (⚙︎, Standard 2 mm/h). <b>⚠️ Aufpassen</b>: ab 25 % Starkregen, Glätte, Schnee oder Böen ab 60 km/h.</p>
       </details>
     </section>

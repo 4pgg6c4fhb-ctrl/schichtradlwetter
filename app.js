@@ -52,15 +52,9 @@ const timeFmt = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-d
 const shortDayFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short', day: 'numeric', month: 'numeric' });
 const wdFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short' });
 const hr = (t) => String(new Date(t).getHours());
-const VERDICT = { ok: ['✅', 'Fahren'], warn: ['⚠️', 'Aufpassen'], stop: ['🚫', 'Nicht fahren: zu starker Regen'] };
+const VERDICT = { ok: ['✅', 'fahren'], warn: ['⚠️', 'aufpassen'], stop: ['🚫', 'nicht fahren'] };
 const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 const deg = (x) => (isNum(x) ? `${fmt0(x)}°` : '–');
-
-// Symbol-Kacheln im Kreis; Punkte = Stufe (dünn/mittel/dick). Text erscheint erst nach Antippen der Karte.
-function tiles(list, cls = '') {
-  return list.map(([icon, text, level]) =>
-    `<span class="tile ${cls}" title="${esc(text)}"><span class="circ">${icon}</span><i>${'•'.repeat(level || 0)}</i><small>${esc(text)}</small></span>`).join('');
-}
 
 function renderNow(hours) {
   const h = hours[0];
@@ -80,32 +74,45 @@ function renderClothing(hours) {
   const c = clothing(hours.slice(0, 12));
   $('clothCard').hidden = !c;
   if (!c) return;
-  $('clothSummary').textContent = `🚲 ${deg(c.fMin)} · 💧 ${fmt0(c.pMax)} %`;
-  $('clothList').innerHTML = tiles(c.warnings, 'warn') + tiles(c.items);
+  $('clothSummary').textContent = `gefühlt bis ${deg(c.fMin)}`;
+  const rows = [
+    ['Handschuhe + Kappe', c.gloves ? 'Ja' : 'Nein'],
+    ['Oberbekleidung', c.top === 'dick' ? 'Dick' : 'Dünn'],
+    ['Hose', c.pants === 'dick' ? 'Dick' : 'Dünn'],
+    ['Regenzeug', c.rain === 'anziehen' ? 'Anziehen' : c.rain === 'einpacken' ? 'Einpacken' : 'Nein'],
+  ];
+  $('clothList').innerHTML = c.warnings.map((w) => `<div class="krow warn"><span>⚠️ ${esc(w)}</span></div>`).join('') +
+    rows.map(([k, v]) => `<div class="krow"><span>${k}</span><b>${v}</b></div>`).join('');
 }
 
-// Eine Fahrt (Hin oder Heim): Ampel, gefühlte Temperatur, Regen, Kleidung als Symbole.
-function rideHtml(arrow, from, to, hourKey, byT) {
+// Eine Fahrt (Hin oder Heim) als Text: Ampel, gefühlte Temperatur, Regen, Kleidung.
+function rideHtml(name, from, to, hourKey, byT) {
   if (hourKey <= Date.now()) return '';
   const h = byT.get(hourKey);
-  const lbl = `${arrow} ${hr(from)}–${hr(to)}`;
-  if (!h) return `<div class="ride none"><div class="ride-top"><span class="lbl">${lbl}</span>noch keine Vorhersage</div></div>`;
+  const lbl = `${name} ${hr(from)}–${hr(to)} Uhr`;
+  if (!h) return `<div class="ride none"><div class="ride-top"><span class="lbl">${lbl}</span></div>noch keine Vorhersage</div>`;
   const c = clothing([h]);
   const [vi, vt] = VERDICT[c.verdict];
   return `<div class="ride ${c.verdict}">
-    <div class="ride-top"><span class="lbl">${lbl}</span>
-      <span class="big">🚲 ${deg(h.feel)}</span><span>💧 ${fmt0(h.prob)} %</span>
-      <span class="v" title="${vt}">${vi}</span></div>
-    <div class="tiles sm">${tiles(c.warnings, 'warn')}${tiles(c.items)}</div></div>`;
+    <div class="ride-top"><span class="lbl">${lbl}</span><span class="v">${vi} ${vt}</span></div>
+    <div class="ride-info">gefühlt <b>${deg(h.feel)}</b> · Regen <b>${fmt0(h.prob)} %</b>${c.warnings.length ? ` · <span class="w">${esc(c.warnings.join(', '))}</span>` : ''}</div>
+    <div class="ride-cloth">${clothingText(c)}</div></div>`;
 }
 
 const SHIFT_COLOR = { Früh: 'c-orange', Spät: 'c-purple', Nacht: 'c-night' };
+
+// Schicht-Name mit Nummer im Rad, z. B. "zweiten Spätschicht"
+function shiftOrdinal(d, s) {
+  const sh = shiftFor(d, s.cycleStart);
+  const prev = shiftFor(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1), s.cycleStart);
+  return `${prev === sh ? 'zweiten' : 'ersten'} ${sh.name}schicht`;
+}
 
 function renderShifts(hours, s) {
   const byT = new Map(hours.map((h) => [h.t, h]));
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const html = [];
-  const problems = [];
+  const notes = { stop: [], rain: [], other: [], none: [] };
   let free = null;
   const flushFree = () => {
     if (!free) return;
@@ -126,27 +133,46 @@ function renderShifts(hours, s) {
     const end = start + sh.len * HOUR;
     if (end + HOUR <= Date.now()) continue;            // schon vorbei
     flushFree();
-    const keys = [start, end + HOUR].filter((k) => k > Date.now());
-    const rides = keys.map((k) => byT.get(k)).filter(Boolean);
-    const verdicts = rides.map((h) => clothing([h]));
-    const worst = verdicts.some((v) => v.verdict === 'stop') ? 'stop' : verdicts.some((v) => v.verdict === 'warn') ? 'warn' : 'ok';
-    const trend = rides.some((h) => h.range === 'lang');
+    const rideKeys = [['Hinweg', start], ['Heimweg', end + HOUR]].filter(([, k]) => k > Date.now());
+    const rides = rideKeys.map(([n, k]) => [n, byT.get(k)]).filter(([, h]) => h);
+    const assessed = rides.map(([n, h]) => [n, clothing([h]), h]);
+    const worst = assessed.some(([, c]) => c.verdict === 'stop') ? 'stop' : assessed.some(([, c]) => c.verdict === 'warn') ? 'warn' : 'ok';
+    const trend = rides.some(([, h]) => h.range === 'lang');
     const label = i === 0 ? 'Heute' : i === 1 ? 'Morgen' : shortDayFmt.format(d);
-    if (rides.length && worst !== 'ok') {
-      const icons = [...new Set(verdicts.flatMap((v) => v.warnings.map((w) => w[0])))].join('');
-      problems.push(`${VERDICT[worst][0]} ${label} ${sh.icon} ${icons}`);
-    }
+
+    // Text für die Zusammenfassung
+    const who = `bei der ${shiftOrdinal(d, s)} (${label === 'Heute' || label === 'Morgen' ? label.toLowerCase() : shortDayFmt.format(d)})`;
+    // "am Hinweg" / "am Heimweg" / "am Hin- und Heimweg"
+    const where = (pred) => {
+      const n = assessed.filter(([, c]) => pred(c)).map(([x]) => x);
+      return n.length === 2 ? 'am Hin- und Heimweg' : `am ${n[0]}`;
+    };
+    const unsure = trend ? ' (noch unsicher)' : '';
+    if (rideKeys.length && !rides.length) notes.none.push(who);
+    else if (worst === 'stop') notes.stop.push(`${who} ist ${where((c) => c.verdict === 'stop')} mit viel Regen zu rechnen – besser nicht mit dem Rad${unsure}.`);
+    else if (assessed.some(([, c]) => c.pHeavy >= 25)) notes.rain.push(`${who} kann es ${where((c) => c.pHeavy >= 25)} stark regnen${unsure}.`);
+    if (assessed.some(([, c]) => c.ice)) notes.other.push(`${who} besteht ${where((c) => c.ice)} Glättegefahr${unsure}.`);
+    if (assessed.some(([, c]) => c.storm)) notes.other.push(`${who} gibt es ${where((c) => c.storm)} Sturmböen${unsure}.`);
+
     html.push(`<div class="shift">
       <div class="sh-head"><span class="circ ${SHIFT_COLOR[sh.name]}">${sh.icon}</span>
-        <div><div class="title">${label}${trend ? '<span class="trend" title="Langfrist-Trend (ECMWF), noch unsicher">≈ Trend</span>' : ''}</div>
-        <div class="sub">${sh.name} ${sh.s}–${(sh.s + sh.len) % 24} Uhr</div></div>
+        <div><div class="title">${label}${trend ? '<span class="trend" title="Langfrist-Trend (ECMWF), noch unsicher">Trend</span>' : ''}</div>
+        <div class="sub">${sh.name}schicht ${sh.s}–${(sh.s + sh.len) % 24} Uhr</div></div>
         ${rides.length ? `<span class="v">${VERDICT[worst][0]}</span>` : ''}</div>
-      ${rideHtml('➡️', start - HOUR, start, start, byT)}${rideHtml('⬅️', end, end + HOUR, end + HOUR, byT)}</div>`);
+      ${rideHtml('Hinweg', start - HOUR, start, start, byT)}${rideHtml('Heimweg', end, end + HOUR, end + HOUR, byT)}</div>`);
   }
   flushFree();
-  $('shiftSummary').innerHTML = problems.length
-    ? problems.map((p) => `<span class="chip">${p}</span>`).join('')
-    : '<span class="chip ok">✅ Keine Wetterprobleme in Sicht</span>';
+
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const lines = [];
+  if (!notes.stop.length && !notes.rain.length) {
+    lines.push(`<p class="sum ok">✅ <b>Fahrten im ganzen Schichtrad möglich</b> – kein Starkregen in Sicht.</p>`);
+  }
+  notes.stop.forEach((t) => lines.push(`<p class="sum stop">🚫 ${cap(t)}</p>`));
+  notes.rain.forEach((t) => lines.push(`<p class="sum warn">⚠️ ${cap(t)}</p>`));
+  notes.other.forEach((t) => lines.push(`<p class="sum warn">⚠️ ${cap(t)}</p>`));
+  if (notes.none.length) lines.push(`<p class="sum muted">Für ${notes.none.length === 1 ? 'eine Schicht' : notes.none.length + ' Schichten'} gibt es noch keine Vorhersage.</p>`);
+  $('shiftSummary').innerHTML = lines.join('');
   $('shifts').innerHTML = html.join('');
 }
 
@@ -239,8 +265,6 @@ $('hours').addEventListener('click', (ev) => {
   const col = ev.target.closest('.hcol');
   if (col) showHourDetail(+col.dataset.i);
 });
-// Antippen einer Karte mit Symbolen blendet die Erklärtexte ein/aus.
-document.querySelectorAll('.tap-text').forEach((el) => el.addEventListener('click', () => el.classList.toggle('show-text')));
 
 // ---------- Tabs ----------
 const TITLES = { heute: 'Heute', schichten: 'Schichten', woche: 'Woche' };
