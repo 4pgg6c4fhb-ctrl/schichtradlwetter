@@ -95,16 +95,29 @@ header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
 .chip { font-size: 13px; font-weight: 500; padding: 5px 10px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); }
 .chip.extra { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 
-/* Aktuelle Schicht */
-.cur-badge { margin: 10px 0 2px; }
-.cur-ride { padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border); }
-.cur-ride .status-line { margin: 0 0 4px; }
-.cur-name { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-.cur-name svg.i { width: 15px; height: 15px; }
-.metrics.four { grid-template-columns: repeat(4, 1fr); margin: 10px 0 12px; }
-.metrics.four .metric { padding: 8px 10px; }
-.metrics.four .v { font-size: 18px; }
-.metrics.four .l { font-size: 11px; }
+/* Aktuelle Schicht (kompakt, passt auf einen Bildschirm) */
+.next { padding: 12px 14px; }
+.cur-top { display: flex; align-items: center; gap: 10px; }
+.cur-title { flex: 1; min-width: 0; }
+.cur-title b { display: block; font-size: 15px; font-weight: 700; }
+.cur-title span { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cur-title svg.i { width: 13px; height: 13px; }
+.cur-ride { padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--border); }
+.cur-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cur-name { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cur-name svg.i { width: 15px; height: 15px; color: var(--muted); }
+.cur-verdict { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 700; }
+.cur-verdict svg.i { width: 18px; height: 18px; }
+.cur-verdict.ok { color: var(--ok); } .cur-verdict.warn { color: var(--warn); } .cur-verdict.stop { color: var(--stop); }
+.cur-why { font-size: 12px; margin-top: 2px; }
+.cur-why.warn { color: var(--warn); } .cur-why.stop { color: var(--stop); }
+.mini { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 8px 0 6px; }
+.mini div { background: var(--surface2); border-radius: 8px; padding: 5px 2px; text-align: center; min-width: 0; }
+.mini b { display: block; font-size: 15px; font-weight: 700; line-height: 1.2; }
+.mini span { display: block; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.next .chips { gap: 4px; margin-top: 4px; }
+.next .chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; }
+.next .overline { font-size: 10px; }
 
 /* Zusammenfassung */
 .verdict-line { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
@@ -164,22 +177,37 @@ details p { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
 .foot b { color: var(--muted); font-weight: 600; }
 .foot a { color: var(--muted); }
 
-/* Einstellungen */
-dialog { border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text);
-  width: min(520px, calc(100% - 24px)); max-height: 90vh; overflow-y: auto; padding: 20px; }
+/* Einstellungen: passt aufs Handy, Felder mit 16 px (sonst zoomt iOS) */
+dialog { border: 1px solid var(--border); border-radius: 18px; background: var(--bg); color: var(--text);
+  width: min(520px, calc(100% - 16px)); max-width: none; max-height: calc(100dvh - 24px); padding: 0; overflow: hidden; }
+dialog[open] { display: flex; }
 dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(3px); }
-dialog h2 { margin: 0 0 4px; font-size: 18px; }
-fieldset { border: 0; padding: 0; margin: 18px 0 0; }
-legend { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 8px; }
-label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
-input { width: 100%; font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; }
-input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 0; }
-.lvl { display: flex; gap: 8px; align-items: center; margin: 12px 0 6px; font-size: 13px; color: var(--muted); }
-.lvl input { width: 64px; flex: none; padding: 6px 9px; }
+#settingsForm { display: flex; flex-direction: column; width: 100%; max-height: calc(100dvh - 24px); }
+.dlg-head { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+.dlg-head h2 { margin: 0; font-size: 17px; }
+.dlg-body { overflow-y: auto; padding: 10px 12px 4px; -webkit-overflow-scrolling: touch; }
+.grp { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px 12px; margin-bottom: 10px; }
+.grp-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+input { width: 100%; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px; }
+input[type=date] { min-height: 38px; }
+textarea { width: 100%; font: inherit; font-size: 16px; line-height: 1.3; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; padding: 6px 10px; resize: none; }
+input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 0; }
+.set-row { display: grid; grid-template-columns: 1fr 112px; align-items: center; gap: 8px; margin-top: 8px; }
+.set-row > span { font-size: 14px; }
+.set-row small { display: block; font-size: 11px; color: var(--dim); }
+.set-row.wide { grid-template-columns: 1fr 150px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.grid2 .set-row { grid-template-columns: auto 1fr; }
+.grid2 .set-row > span { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.unit { display: flex; align-items: center; gap: 5px; }
+.unit em { font-style: normal; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.lvl { display: grid; grid-template-columns: 76px 1fr; gap: 8px; align-items: center; margin-top: 8px; }
+.lvl .unit input { width: 48px; padding: 7px 6px; text-align: center; }
 .row { display: flex; gap: 8px; } .row > * { flex: 1; }
 .hint { font-size: 12px; color: var(--dim); margin-top: 4px; }
-.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
-.btn { font: inherit; font-weight: 600; border: 1px solid var(--border); border-radius: 10px; padding: 9px 16px; background: var(--surface2); color: var(--text); cursor: pointer; }
+.actions { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--surface); }
+.btn { font: inherit; font-weight: 600; border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px; background: var(--surface2); color: var(--text); cursor: pointer; }
 .btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
 .btn.left { margin-right: auto; }
 .row.search { align-items: center; }
@@ -246,68 +274,59 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
 
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
-    <h2>Einstellungen</h2>
-    <div class="hint">Werte gelten nur auf diesem Gerät.</div>
+    <div class="dlg-head"><h2>Einstellungen</h2><span class="hint">nur auf diesem Gerät</span></div>
+    <div class="dlg-body">
 
-    <fieldset>
-      <legend>Kleidung nach gefühlter Temperatur</legend>
-      <div class="lvl">unter <input id="l1" inputmode="decimal"> °C</div>
-      <input id="l1t">
-      <div class="lvl">unter <input id="l2" inputmode="decimal"> °C</div>
-      <input id="l2t">
-      <div class="lvl">unter <input id="l3" inputmode="decimal"> °C</div>
-      <input id="l3t">
-      <div class="lvl">darüber</div>
-      <input id="l4t">
-    </fieldset>
+      <section class="grp">
+        <div class="grp-title">Strecke</div>
+        <label for="startQ">Start</label>
+        <div class="row search"><input id="startQ" placeholder="Adresse oder Ort" autocomplete="off"><button class="btn" type="button" data-find="start" aria-label="Start suchen"></button></div>
+        <div class="found" id="startFound"></div>
+        <label for="zielQ">Ziel</label>
+        <div class="row search"><input id="zielQ" placeholder="z. B. Arbeitsplatz" autocomplete="off"><button class="btn" type="button" data-find="ziel" aria-label="Ziel suchen"></button></div>
+        <div class="found" id="zielFound"></div>
+        <div class="set-row"><span>Fahrzeit</span><div class="unit"><input id="rideMin" inputmode="numeric" placeholder="auto"><em>min</em></div></div>
+        <div class="hint" id="rideHint"></div>
+        <input type="hidden" id="startName"><input type="hidden" id="startLat"><input type="hidden" id="startLon">
+        <input type="hidden" id="zielName"><input type="hidden" id="zielLat"><input type="hidden" id="zielLon">
+      </section>
 
-    <fieldset>
-      <legend>Grenzen</legend>
-      <label for="heavyMm">Zu viel Regen ab (mm pro Stunde)</label>
-      <input id="heavyMm" inputmode="decimal">
-      <div class="hint">0,1 = Tröpfeln · 0,5 = leichter Regen · 2 = kräftiger Regen</div>
-      <label for="snowCm">Schneefahrbahn ab Neuschnee (cm)</label>
-      <input id="snowCm" inputmode="decimal">
-      <label for="rideKmh">Fahrtgeschwindigkeit für „gefühlt“ (km/h)</label>
-      <input id="rideKmh" inputmode="decimal">
-    </fieldset>
+      <section class="grp">
+        <div class="grp-title">Schichtsystem</div>
+        <label for="cycle">System <span class="hint">(Zahl = Schicht, f = frei)</span></label>
+        <input id="cycle" placeholder="1 1 2 2 3 3 f f f f" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="grid2">
+          <div class="set-row"><span>Schicht 1</span><input id="t1" placeholder="6-14"></div>
+          <div class="set-row"><span>Schicht 2</span><input id="t2" placeholder="14-22"></div>
+          <div class="set-row"><span>Schicht 3</span><input id="t3" placeholder="22-6"></div>
+          <div class="set-row"><span>Schicht 4</span><input id="t4" placeholder="–"></div>
+        </div>
+        <div class="set-row wide"><span>Tag 1 des Systems</span><input id="cycleStart" type="date"></div>
+      </section>
 
-    <fieldset>
-      <legend>Strecke</legend>
-      <label for="startQ">Start (Adresse oder Ort)</label>
-      <div class="row search"><input id="startQ" placeholder="z. B. Wörgl, Bahnhofstraße 1" autocomplete="off"><button class="btn" type="button" data-find="start" aria-label="Start suchen"></button></div>
-      <div class="found" id="startFound"></div>
-      <label for="zielQ">Ziel (Arbeitsplatz)</label>
-      <div class="row search"><input id="zielQ" placeholder="z. B. Kufstein, Arbeitsstraße 5" autocomplete="off"><button class="btn" type="button" data-find="ziel" aria-label="Ziel suchen"></button></div>
-      <div class="found" id="zielFound"></div>
-      <label for="rideMin">Fahrzeit in Minuten</label>
-      <input id="rideMin" inputmode="numeric" placeholder="automatisch">
-      <div class="hint" id="rideHint">Leer = aus Entfernung und Fahrtgeschwindigkeit.</div>
-      <input type="hidden" id="startName"><input type="hidden" id="startLat"><input type="hidden" id="startLon">
-      <input type="hidden" id="zielName"><input type="hidden" id="zielLat"><input type="hidden" id="zielLon">
-    </fieldset>
+      <section class="grp">
+        <div class="grp-title">Freie Tage</div>
+        <div class="grid2">
+          <div class="set-row"><span>Hinfahrt</span><div class="unit"><input id="freeOut" inputmode="decimal" placeholder="5"><em>Uhr</em></div></div>
+          <div class="set-row"><span>Rückfahrt</span><div class="unit"><input id="freeBack" inputmode="decimal" placeholder="16"><em>Uhr</em></div></div>
+        </div>
+      </section>
 
-    <fieldset>
-      <legend>Schichtsystem</legend>
-      <label for="cycle">System (Zahl = Schicht, f = frei)</label>
-      <input id="cycle" placeholder="1 1 2 2 3 3 f f f f" autocapitalize="off" autocorrect="off">
-      <div class="hint">Ein Eintrag pro Tag, das System wiederholt sich.</div>
-      <div class="lvl">Schicht 1 <input id="t1" placeholder="6-14" style="width:110px"></div>
-      <div class="lvl">Schicht 2 <input id="t2" placeholder="14-22" style="width:110px"></div>
-      <div class="lvl">Schicht 3 <input id="t3" placeholder="22-6" style="width:110px"></div>
-      <div class="lvl">Schicht 4 <input id="t4" placeholder="optional" style="width:110px"></div>
-      <label for="cycleStart">Tag 1 des Systems (erster Eintrag)</label>
-      <input id="cycleStart" type="date">
-    </fieldset>
+      <section class="grp">
+        <div class="grp-title">Kleidung nach gefühlter Temperatur</div>
+        <div class="lvl"><div class="unit"><em>&lt;</em><input id="l1" inputmode="decimal"><em>°</em></div><textarea id="l1t" rows="1"></textarea></div>
+        <div class="lvl"><div class="unit"><em>&lt;</em><input id="l2" inputmode="decimal"><em>°</em></div><textarea id="l2t" rows="1"></textarea></div>
+        <div class="lvl"><div class="unit"><em>&lt;</em><input id="l3" inputmode="decimal"><em>°</em></div><textarea id="l3t" rows="1"></textarea></div>
+        <div class="lvl"><div class="unit"><em>darüber</em></div><textarea id="l4t" rows="1"></textarea></div>
+      </section>
 
-    <fieldset>
-      <legend>Freie Tage</legend>
-      <label>Hinfahrt und Rückfahrt (Uhr)</label>
-      <div class="row">
-        <input id="freeOut" inputmode="decimal" placeholder="5">
-        <input id="freeBack" inputmode="decimal" placeholder="16">
-      </div>
-    </fieldset>
+      <section class="grp">
+        <div class="grp-title">Grenzen</div>
+        <div class="set-row"><span>Zu viel Regen ab<small>0,1 Tröpfeln · 0,5 leicht · 2 kräftig</small></span><div class="unit"><input id="heavyMm" inputmode="decimal"><em>mm/h</em></div></div>
+        <div class="set-row"><span>Schneefahrbahn ab</span><div class="unit"><input id="snowCm" inputmode="decimal"><em>cm</em></div></div>
+        <div class="set-row"><span>Fahrtgeschwindigkeit</span><div class="unit"><input id="rideKmh" inputmode="decimal"><em>km/h</em></div></div>
+      </section>
+    </div>
 
     <div class="actions">
       <button class="btn left" type="button" id="btnDefaults">Standard</button>
@@ -317,7 +336,7 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
   </form>
 </dialog>
 
-<script src="core.js?v=19"></script>
-<script src="app.js?v=19"></script>
+<script src="core.js?v=22"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

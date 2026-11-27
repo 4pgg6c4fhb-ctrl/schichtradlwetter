@@ -266,32 +266,30 @@ function renderCurrent(items, rt, s) {
   const trend = it.rides.some((r) => r.a?.trend);
   const withA = it.rides.filter((r) => r.a);
   const sameClothes = withA.length === 2 && withA[0].a.clothes === withA[1].a.clothes;
+  const cell = (v, l) => `<div><b>${v}</b><span>${l}</span></div>`;
   const rideBlock = (r) => {
-    const head = `<div class="cur-name">${icon(r.name === 'Hinfahrt' ? (it.sh.free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</div>`;
-    if (!r.a) return `<div class="cur-ride">${head}<div class="hint">noch keine Vorhersage</div></div>`;
+    const name = `<span class="cur-name">${icon(r.name === 'Hinfahrt' ? (it.sh.free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)}</span>`;
+    if (!r.a) return `<div class="cur-ride"><div class="cur-row">${name}<span class="hint">keine Vorhersage</span></div></div>`;
     const a = r.a;
+    const [wv, wl] = windCell(r);
     return `<div class="cur-ride">
-      <div class="status-line">
-        <div class="status-icon ${a.verdict}">${icon(a.verdict)}</div>
-        <div class="status-text">${head}<b>${VERDICT[a.verdict]}</b>${a.reasons.length ? `<span>${esc(a.reasons.join(' · '))}</span>` : ''}</div>
-      </div>
-      <div class="metrics num">
-        <div class="metric"><div class="v">${deg(a.fMin)}</div><div class="l">${icon('bike')}Gefühlt</div></div>
-        <div class="metric"><div class="v">${pct(r.h.prob)}</div><div class="l">${icon('drop')}Regen</div></div>
-        <div class="metric"><div class="v">${pct(a.pSnow)}</div><div class="l">${icon('snow')}Schnee</div></div>
-        <div class="metric"><div class="v">${deg(r.h.temp)}</div><div class="l">${icon('thermo')}Luft</div></div>
-        <div class="metric"><div class="v">${pct(r.h.rh)}</div><div class="l">${icon('humid')}Feuchte</div></div>
-        <div class="metric"><div class="v">${windCell(r)[0]}</div><div class="l">${icon('wind')}${windCell(r)[1]}</div></div>
-      </div>
-      ${sameClothes ? '' : `<div class="overline">Kleidung</div>${chips(a.clothes)}`}</div>`;
+      <div class="cur-row">${name}<span class="cur-verdict ${a.verdict}">${icon(a.verdict)}${VERDICT[a.verdict]}</span></div>
+      ${a.reasons.length ? `<div class="cur-why ${a.verdict}">${esc(a.reasons.join(' · '))}</div>` : ''}
+      <div class="mini num">${cell(deg(a.fMin), 'gefühlt')}${cell(pct(r.h.prob), 'Regen')}${cell(pct(a.pSnow), 'Schnee')}${cell(pct(r.h.rh), 'Feuchte')}${cell(wv, wl)}</div>
+      ${sameClothes ? '' : chips(a.clothes)}</div>`;
   };
+  const shiftText = it.sh.free ? 'Frei' : `${it.sh.name}schicht ${fmtH(it.sh.s)}–${fmtH((it.sh.s + it.sh.len) % 24)}`;
+  const [n1, n2] = routeNames(s);
+  const routeText = `${esc(n1)}${s.zielName ? ` → ${esc(n2)}` : ''}${isNum(rt.km) ? ` · ${fmt0(rt.km)} km` : ''} · ${fmt0(rt.min)} min`;
   const past = it.rides.length === 1 && it.rides[0].name === 'Rückfahrt' ? '<div class="hint">Hinfahrt bereits vorbei</div>' : '';
   el.innerHTML = `
-    <div class="head"><span class="overline">Aktuelle Schicht · ${dayLabel(it.i, it.d)}</span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
-    <div class="cur-badge">${shiftBadge(it)}</div>
-    <div class="route">${icon('route')}${esc(routeNames(s)[0])}${s.zielName ? ` → ${esc(routeNames(s)[1])}` : ''}${isNum(rt.km) ? ` · ca. ${fmt0(rt.km)} km` : ''} · ${fmt0(rt.min)} min</div>
+    <div class="cur-top">
+      <span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span></span>
+      <div class="cur-title"><b>${dayLabel(it.i, it.d)} · ${shiftText}</b><span>${icon('route')}${routeText}</span></div>
+      ${trend ? '<span class="tag">Trend</span>' : ''}
+    </div>
     ${past}${it.rides.map(rideBlock).join('')}
-    ${sameClothes ? `<div class="cur-ride"><div class="overline">Kleidung · Hin- und Rückfahrt</div>${chips(withA[0].a.clothes)}</div>` : ''}`;
+    ${sameClothes ? `<div class="cur-ride"><div class="overline">Kleidung · Hin &amp; Rück</div>${chips(withA[0].a.clothes)}</div>` : ''}`;
   return it;
 }
 
@@ -446,8 +444,12 @@ function updateRideHint() {
     ? `Strecke ca. ${fmt0(rt.km)} km → automatisch ${rt.auto} min bei ${fmt0(num(v.rideKmh, 20))} km/h. Leer lassen = automatisch.`
     : 'Leer = 30 min (ohne Ziel). Mit Ziel wird die Zeit aus der Entfernung berechnet.';
 }
+// Textfelder wachsen mit dem Inhalt mit
+const autoSize = (t) => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; };
+document.querySelectorAll('#settings textarea').forEach((t) => t.addEventListener('input', () => autoSize(t)));
 function fillForm(s) {
   FIELDS.forEach((f) => { $(f).value = s[f]; });
+  requestAnimationFrame(() => document.querySelectorAll('#settings textarea').forEach(autoSize));
   $('startQ').value = s.startName; $('zielQ').value = s.zielName;
   showPlace('start'); showPlace('ziel'); updateRideHint();
 }
