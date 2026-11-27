@@ -254,6 +254,7 @@ const esc = (x) => String(x).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&
 const deg = (x) => (isNum(x) ? `${fmt0(x)}°` : '–');
 const pct = (x) => (isNum(x) ? `${fmt0(x)} %` : '–');
 const dayLabel = (i, d) => (i === 0 ? 'Heute' : i === 1 ? 'Morgen' : i === -1 ? 'Gestern' : shortDayFmt.format(d));
+const dot = (v) => `<span class="vdot ${v}" title="${VERDICT[v]}" aria-label="${VERDICT[v]}">${icon(v)}</span>`;
 const pill = (v) => `<span class="pill ${v}">${icon(v)}${VERDICT[v]}</span>`;
 const worstOf = (rides) => {
   const v = rides.map((r) => r.a?.verdict).filter(Boolean);
@@ -368,18 +369,18 @@ function renderSummary(items, s) {
 
 // Ein Fahrt-Block in der Liste: nur ob es geht und welche Gefahren es gibt.
 function rideHtml(r, free = false) {
-  const name = `<span class="ride-name">${wxIcon(r.h, r.a) || icon(r.name === 'Hinfahrt' ? 'work' : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
+  const name = `<span class="ride-name">${wxIcon(r.h, r.a) || icon(r.name === 'Hinfahrt' ? 'work' : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)}</span>`;
   if (!r.a) return `<div class="ride none"><div class="ride-row">${name}<span class="hint">keine Vorhersage</span></div></div>`;
   const a = r.a;
   return `<div class="ride ${a.verdict}">
-    <div class="ride-row">${name}${pill(a.verdict)}</div>
+    <div class="ride-row">${name}<span class="ride-end"><span class="feel" title="gefühlt am Rad">${deg(a.fMin)}</span>${dot(a.verdict)}</span></div>
     ${a.reasons.length ? `<div class="ride-why">${esc(a.reasons.join(' · '))}</div>` : ''}</div>`;
 }
 // Beide Fahrten ohne Gefahr → eine Zeile.
 function ridesHtml(rides, free) {
   const [h, r] = rides;
   if (rides.length === 2 && h.a?.verdict === 'ok' && r.a?.verdict === 'ok') {
-    return `<div class="ride ok"><div class="ride-row"><span class="ride-name"><span class="wx2">${wxIcon(h.h, h.a)}${wxIcon(r.h, r.a)}</span>Hin- und Rückfahrt</span>${pill('ok')}</div></div>`;
+    return `<div class="ride ok"><div class="ride-row"><span class="ride-name"><span class="wx2">${wxIcon(h.h, h.a)}${wxIcon(r.h, r.a)}</span>Hin &amp; Rück</span><span class="ride-end"><span class="feel" title="gefühlt am Rad: Hin / Rück">${deg(h.a.fMin)} / ${deg(r.a.fMin)}</span>${dot('ok')}</span></div></div>`;
   }
   return rides.map((x) => rideHtml(x, free)).join('');
 }

@@ -129,6 +129,14 @@ svg.i.wx { width: 20px; height: 20px; stroke-width: 1.8; }
 .wx-rain, .wx-showers { color: #3b9cff !important; }
 .wx-snow { color: #7dd3fc !important; }
 .wx2 { display: inline-flex; gap: 2px; }
+.ride-end { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.ride.none .hint { margin-left: auto; white-space: nowrap; margin-top: 0; }
+.vdot { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; flex: none; }
+.vdot svg.i { width: 17px; height: 17px; vertical-align: 0; }
+.vdot.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.vdot.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.vdot.stop { color: var(--stop); background: color-mix(in srgb, var(--stop) 15%, transparent); }
+.ride-end .feel { font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Zusammenfassung */
 .verdict-line { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
@@ -142,7 +150,8 @@ svg.i.wx { width: 20px; height: 20px; stroke-width: 1.8; }
 .notes .when { font-weight: 600; }
 
 /* Schichtliste */
-.shift { display: grid; grid-template-columns: 46px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.shift { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.shift > div { min-width: 0; }
 .shift:first-child { border-top: 0; padding-top: 2px; }
 .date { text-align: center; }
 .date .wd { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
@@ -159,8 +168,8 @@ svg.i.wx { width: 20px; height: 20px; stroke-width: 1.8; }
 .badge small { font-weight: 500; color: var(--muted); font-size: 13px; }
 .ride { padding: 8px 0; border-top: 1px dashed var(--border); }
 .ride:first-of-type { border-top: 0; }
-.ride-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.ride-name { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.ride-row { display: flex; align-items: center; gap: 8px; }
+.ride-name { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ride-row { justify-content: space-between; }
 .ride-name svg.i { width: 15px; height: 15px; }
 .ride-vals { font-size: 13px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
@@ -252,7 +261,7 @@ input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent
   </section>
 
   <section class="card">
-    <div class="section-head"><h2>Weitere Tage</h2><span class="overline">Hin- &amp; Rückfahrt</span></div>
+    <div class="section-head"><h2>Weitere Tage</h2><span class="overline">gefühlt · Hin / Rück</span></div>
     <div id="shifts"></div>
   </section>
 
@@ -349,7 +358,7 @@ input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent
   </form>
 </dialog>
 
-<script src="core.js?v=26"></script>
-<script src="app.js?v=26"></script>
+<script src="core.js?v=30"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>
