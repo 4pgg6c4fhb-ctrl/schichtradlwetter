@@ -99,6 +99,9 @@ header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
 .next { padding: 12px 14px; }
 .cur-top { display: flex; align-items: center; gap: 10px; }
 .cur-title { flex: 1; min-width: 0; }
+.radar-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); border-radius: 8px; padding: 4px 8px; flex: none; }
+.radar-btn svg.i { width: 15px; height: 15px; }
 .cur-title b { display: block; font-size: 15px; font-weight: 700; }
 .cur-title span { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cur-title svg.i { width: 13px; height: 13px; }
@@ -120,6 +123,7 @@ header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
 .next .overline { font-size: 10px; }
 
 /* Wettersymbole */
+.wx-thunder { color: #c084fc !important; }
 svg.i.wx { width: 20px; height: 20px; stroke-width: 1.8; }
 .cur-name svg.i.wx, .ride-name svg.i.wx { width: 20px; height: 20px; color: inherit; }
 .wx-sun { color: #f5b301 !important; } .wx-sunCloud { color: #e0a400 !important; }
@@ -264,6 +268,8 @@ input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent
       <p><b>Fahrzeit</b> = Entfernung (Luftlinie × 1,3) ÷ Fahrtgeschwindigkeit, oder selbst eingetragen. Hinfahrt endet zu Schichtbeginn, Rückfahrt beginnt zu Schichtende.</p>
       <p><b>Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe mehr Regen als deine Grenze bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder Schneefahrbahn droht. <b>Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
       <p><b>Glätte</b> nur bei Feuchtigkeit: nasse Fahrbahn bei Frost (Niederschlag jetzt oder in den 6 Stunden davor) oder Reif (Frost + Luftfeuchte ab 92 % bei klarem Himmel, Nebelreif ab 97 %).</p>
+      <p><b>Gewitter:</b> Anteil der Wetterläufe mit Gewitterenergie (CAPE ab 400 J/kg) und gleichzeitig Niederschlag. Ab 20 % „Aufpassen“, ab 50 % „Nicht fahren“.</p>
+      <p><b>Start und Ziel:</b> Ist das Ziel mehr als 3 km entfernt, wird das Wetter an beiden Orten geprüft und der ungünstigere Wert genommen.</p>
       <p><b>Schnee:</b> Hinfahrt = Neuschnee der 6 Stunden davor, Rückfahrt = Neuschnee seit der Hinfahrt (ganze Schicht).</p>
       <p><b>Schichtsystem</b> und Zeiten stellst du in den Einstellungen ein, z. B. „1 1 2 2 3 3 f f f f“ mit 1 = 6–14, 2 = 14–22, 3 = 22–6. Früh/Spät/Nacht ergibt sich aus der Beginnzeit.</p>
       <p><b>Freie Tage:</b> Hinfahrt um 5, Rückfahrt um 16 Uhr (einstellbar).</p>
@@ -346,7 +352,7 @@ input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent
   </form>
 </dialog>
 
-<script src="core.js?v=23"></script>
-<script src="app.js?v=23"></script>
+<script src="core.js?v=25"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

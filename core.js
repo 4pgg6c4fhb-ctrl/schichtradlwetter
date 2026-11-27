@@ -58,7 +58,7 @@ async function fetchGeoSphere(lat, lon) {
   const k = `${lat.toFixed(3)},${lon.toFixed(3)}`;
   const ttl = 10 * 60e3;
   const jobs = {
-    nwp: cachedJson('gs-nwp2-' + k, ttl, gsUrl('nwp-v2-1h-1km', ['2t', '2r', 'tp', 'rain', 'sf', 'tcc', '10u', '10v', '10fg'], lat, lon)),
+    nwp: cachedJson('gs-nwp3-' + k, ttl, gsUrl('nwp-v2-1h-1km', ['2t', '2r', 'tp', 'rain', 'sf', 'tcc', '10u', '10v', '10fg', 'cape'], lat, lon)),
     ens: cachedJson('gs-ens-' + k, ttl, gsUrl('ensemble-v2-1h-1km', ['tp_p10', 'tp_p50', 'tp_p90', '2t_p10', '2t_p90'], lat, lon)),
     now: cachedJson('gs-now-' + k, 5 * 60e3, gsUrl('nowcast-v1-15min-1km', ['rr', 't2m', 'pt'], lat, lon)),
   };
@@ -87,11 +87,11 @@ function dirMean(list) {
 //  - icon_d2_eps: DWD ICON-D2, 20 Läufe, 2 km, ~2 Tage
 //  - ecmwf_ifs025: ECMWF, 51 Läufe, 25 km, 12 Tage (für die Schichten weiter voraus)
 async function fetchEnsemble(model, days, ttlMs, lat, lon) {
-  const vars = ['precipitation', 'snowfall', 'temperature_2m', 'relative_humidity_2m', 'cloud_cover', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
+  const vars = ['precipitation', 'snowfall', 'temperature_2m', 'relative_humidity_2m', 'cloud_cover', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m', 'cape'];
   const url = `${OM}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=${vars.join(',')}` +
     `&models=${model}&forecast_days=${days}&timezone=GMT&wind_speed_unit=ms`;
   try {
-    const json = await cachedJson(`om4-${model}-${lat.toFixed(3)},${lon.toFixed(3)}`, ttlMs, url);
+    const json = await cachedJson(`om5-${model}-${lat.toFixed(3)},${lon.toFixed(3)}`, ttlMs, url);
     if (json.error) throw new Error(json.reason || 'Fehler');
     const h = json.hourly || {};
     const members = (name) => Object.keys(h).filter((k) => k === name || k.startsWith(name + '_member'));
@@ -107,6 +107,13 @@ async function fetchEnsemble(model, days, ttlMs, lat, lon) {
       const at = (name) => avg(members(name).map((k) => h[k][i]));
       rows.set(Date.parse(t + 'Z'), {
         prec, prec3, n: prec.length, mm: prec[Math.floor(prec.length / 2)],
+        // Gewitter je Lauf: genug Gewitterenergie (CAPE) UND Niederschlag in derselben Stunde
+        pThunder: (() => {
+          const ck = members('cape');
+          if (ck.length !== pk.length) return null;
+          const both = pk.map((k, m) => [h[k][i], h[ck[m]][i]]).filter(([p, e]) => isNum(p) && isNum(e));
+          return both.length ? 100 * both.filter(([p, e]) => p >= THUNDER_MM && e >= THUNDER_CAPE).length / both.length : null;
+        })(),
         snowM: sk.map((k) => h[k][i]),        // Neuschnee in cm je Lauf (Reihenfolge = Lauf)
         temp: at('temperature_2m'), rh: at('relative_humidity_2m'), cloud: at('cloud_cover'),
         windDir: dirMean(members('wind_direction_10m').map((k) => h[k][i])), wind: at('wind_speed_10m'), gust: at('wind_gusts_10m'),
@@ -120,6 +127,10 @@ async function fetchEnsemble(model, days, ttlMs, lat, lon) {
 }
 const fetchOpenMeteo = (lat, lon) => fetchEnsemble('icon_d2_eps', 3, 15 * 60e3, lat, lon);
 const fetchEcmwf = (lat, lon) => fetchEnsemble('ecmwf_ifs025', 12, 60 * 60e3, lat, lon);
+
+// Gewitter: Gewitterenergie (CAPE, J/kg) und gleichzeitig Niederschlag
+const THUNDER_CAPE = 400;
+const THUNDER_MM = 0.2;
 
 // Anteil (%) der Werte >= thr
 const fracAbove = (arr, thr) => (arr && arr.length ? 100 * arr.filter((x) => x >= thr).length / arr.length : null);
@@ -233,6 +244,11 @@ function buildHours(pos, gs, om, ecm, opts = {}) {
       const wind = avg([windN, o.wind]);
       h = {
         t, prob, pHeavy, mm, temp, wind, day, range: 'kurz',
+        // Gewitter: ICON-D2-Läufe (CAPE + Regen) und GeoSphere-Hauptlauf (CAPE × Regenchance)
+        pThunder: combine([
+          { p: o.pThunder, w: 0.6 },
+          { p: isNum(n.cape) ? probFromAmount(n.cape, 200, 1000) * (prob ?? 0) / 100 : null, w: 0.4 },
+        ]),
         rh: avg([n['2r'], o.rh]),
         // Richtung, aus der der Wind kommt: GeoSphere (u/v) bevorzugt, sonst ICON-D2
         windDir: isNum(n['10u']) && isNum(n['10v']) ? (Math.atan2(-n['10u'], -n['10v']) * 180 / Math.PI + 360) % 360 : o.windDir,
@@ -245,7 +261,7 @@ function buildHours(pos, gs, om, ecm, opts = {}) {
     } else if (x) {
       // Langfrist: ECMWF-Ensemble (grob, Trend)
       h = {
-        t, prob: fracAbove(x.prec, THRESHOLD_MM), pHeavy: fracAbove(x.prec3, heavy * 1.5),
+        t, prob: fracAbove(x.prec, THRESHOLD_MM), pHeavy: fracAbove(x.prec3, heavy * 1.5), pThunder: x.pThunder,
         mm: x.mm, temp: x.temp, rh: x.rh, windDir: x.windDir, wind: x.wind, gust: x.gust, cloud: x.cloud, day, range: 'lang',
         snow: isNum(x.temp) && x.temp < 0.5,
         src: { pEcm: fracAbove(x.prec, THRESHOLD_MM), ecmN: x.n, ecmMm: x.mm },
@@ -354,8 +370,10 @@ function assessRide(hs, snow, prefs, prev = [], bearing = null) {
   const ice = !!iceText;
   const rh = max('rh');
   const storm = isNum(gustKmh) && gustKmh >= 60;
+  const pThunder = max('pThunder') ?? 0;
 
   const reasons = [];
+  if (pThunder >= 20) reasons.push(pThunder >= 50 ? `Gewitter (${fmt0(pThunder)} %)` : `Gewitter möglich (${fmt0(pThunder)} %)`);
   if (pSnow >= 25) reasons.push(pSnow >= 50 ? `Schneefahrbahn (${fmt0(pSnow)} %)` : `evtl. Schnee (${fmt0(pSnow)} %)`);
   if (pHeavy >= 25) reasons.push(pHeavy >= 50 ? `viel Regen (${fmt0(pHeavy)} %)` : `evtl. viel Regen (${fmt0(pHeavy)} %)`);
   if (ice) reasons.push(iceText);
@@ -365,10 +383,10 @@ function assessRide(hs, snow, prefs, prev = [], bearing = null) {
 
   let verdict = 'ok';
   if (reasons.length) verdict = 'warn';
-  if (pHeavy >= 50 || pSnow >= 50) verdict = 'stop';
+  if (pHeavy >= 50 || pSnow >= 50 || pThunder >= 50) verdict = 'stop';
 
   let clothes = outfit(fMin, prefs);
   if (pMax >= 30 && verdict !== 'stop') clothes += ' + Regenjacke';
-  return { verdict, reasons, clothes, fMin, tMin, pMax, pHeavy, pSnow, ice, iceText, rh, storm, head, strongHead,
-    trend: hs.some((h) => h.range === 'lang') || !!snow?.trend };
+  return { verdict, reasons, clothes, fMin, tMin, pMax, pHeavy, pSnow, pThunder, ice, iceText, rh, storm, head, strongHead,
+    trend: hs.some((h) => h.range === 'lang') };
 }
