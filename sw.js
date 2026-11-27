@@ -1,6 +1,6 @@
 // App-Hülle offline verfügbar machen; Wetterdaten immer frisch aus dem Netz.
-const CACHE = 'wetter-v25';
-const SHELL = ['./', 'index.html', 'core.js', 'app.js', 'core.js?v=25', 'app.js?v=25', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'wetter-v26';
+const SHELL = ['./', 'index.html', 'core.js', 'app.js', 'core.js?v=26', 'app.js?v=26', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', (e) => e.waitUntil(
   caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));

@@ -208,7 +208,6 @@ const ICONS = {
   wind: '<path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>',
   route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-  radar: '<path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
 };
 const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -324,7 +323,6 @@ function renderCurrent(items, rt, s) {
       <span class="badge ${it.sh.cls}"><span class="dot">${icon(it.sh.icon)}</span></span>
       <div class="cur-title"><b>${dayLabel(it.i, it.d)} · ${shiftText}</b><span>${icon('route')}${routeText}</span></div>
       ${trend ? '<span class="tag">Trend</span>' : ''}
-      <a class="radar-btn" href="${RADAR_URL}" target="_blank" rel="noopener" title="Regenradar von GeoSphere Austria">${icon('radar')}Radar</a>
     </div>
     ${past}${it.rides.map(rideBlock).join('')}
     ${sameClothes ? `<div class="cur-ride"><div class="overline">Kleidung · Hin &amp; Rück</div>${chips(withA[0].a.clothes)}</div>` : ''}`;
@@ -405,7 +403,6 @@ function setStatus(parts) { $('status').innerHTML = parts.filter(Boolean).join('
 $('logo').innerHTML = icon('bike');
 $('btnReload').innerHTML = icon('refresh');
 $('btnSettings').innerHTML = icon('sliders');
-const RADAR_URL = 'https://www.geosphere.at/de/karten/wetterportal';
 $('howSummary').insertAdjacentHTML('afterbegin', icon('info'));
 
 // Teilen: Handy → Teilen-Menü, sonst Link kopieren

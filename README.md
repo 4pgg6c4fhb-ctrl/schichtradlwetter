@@ -27,7 +27,6 @@ Eine Seite:
 | Gegenwind-Warnung | ab 25 km/h Gegenwind oder Böen ab 45 km/h |
 | Gewitter | Anteil der Läufe mit CAPE ≥ 400 J/kg und Niederschlag; ab 20 % aufpassen, ab 50 % nicht fahren |
 | Start und Ziel | Ziel > 3 km entfernt → Wetter an beiden Orten, der ungünstigere Wert zählt |
-| Regenradar | Knopf „Radar“ öffnet das GeoSphere-Wetterportal |
 
 🚫 *Nicht fahren*, wenn mindestens die Hälfte der Wetterläufe zu viel Regen oder
 Schneefahrbahn bringt; ⚠️ *aufpassen* ab 25 %, bei Glätte oder Sturmböen.
