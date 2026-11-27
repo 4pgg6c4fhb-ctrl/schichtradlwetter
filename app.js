@@ -208,6 +208,36 @@ const ICONS = {
 };
 const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 
+// ---------- Wettersymbol (klein, für die schnelle Übersicht) ----------
+const CLOUD = '<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/>';
+const WX = {
+  sun: ['<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>', 'sonnig'],
+  moon: ['<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>', 'klar'],
+  sunCloud: ['<path d="M12 2v2M4.93 4.93l1.41 1.41M20 12h2M19.07 4.93l-1.41 1.41M15.95 12.65a4 4 0 0 0-5.93-4.13"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>', 'leicht bewölkt'],
+  moonCloud: ['<path d="M13 16a3 3 0 1 1 0 6H7a5 5 0 1 1 4.9-6Z"/><path d="M10.1 9A6 6 0 0 1 16 4a4.24 4.24 0 0 0 6 6 6 6 0 0 1-3 5.2"/>', 'leicht bewölkt'],
+  cloud: ['<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>', 'bewölkt'],
+  fog: [CLOUD + '<path d="M16 17H7M17 21H9"/>', 'Nebel'],
+  showers: [CLOUD + '<path d="M8 19v1M8 14v1M16 19v1M16 14v1M12 21v1M12 16v1"/>', 'evtl. Schauer'],
+  rain: [CLOUD + '<path d="M16 14v6M8 14v6M12 16v6"/>', 'Regen'],
+  snow: [CLOUD + '<path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>', 'Schnee'],
+};
+function wxKind(h, a) {
+  if (!h) return null;
+  const p = h.prob ?? 0;
+  const snowy = (a && a.pSnow >= 25) || (h.snow && p >= 30);
+  if (p >= 50) return snowy ? 'snow' : 'rain';
+  if (p >= 30) return snowy ? 'snow' : 'showers';
+  if ((h.rh ?? 0) >= 98 && (h.wind ?? 9) < 2) return 'fog';
+  const c = h.cloud ?? 100;
+  if (c < 25) return h.day ? 'sun' : 'moon';
+  if (c < 70) return h.day ? 'sunCloud' : 'moonCloud';
+  return 'cloud';
+}
+const wxIcon = (h, a) => {
+  const k = wxKind(h, a);
+  return k ? `<svg class="i wx wx-${k}" viewBox="0 0 24 24" role="img" aria-label="${WX[k][1]}"><title>${WX[k][1]}</title>${WX[k][0]}</svg>` : '';
+};
+
 // ---------- Darstellung ----------
 const wdFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short' });
 const shortDayFmt = new Intl.DateTimeFormat('de-AT', { weekday: 'short', day: 'numeric', month: 'numeric' });
@@ -268,7 +298,7 @@ function renderCurrent(items, rt, s) {
   const sameClothes = withA.length === 2 && withA[0].a.clothes === withA[1].a.clothes;
   const cell = (v, l) => `<div><b>${v}</b><span>${l}</span></div>`;
   const rideBlock = (r) => {
-    const name = `<span class="cur-name">${icon(r.name === 'Hinfahrt' ? (it.sh.free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)}</span>`;
+    const name = `<span class="cur-name">${wxIcon(r.h, r.a) || icon(r.name === 'Hinfahrt' ? 'work' : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)}</span>`;
     if (!r.a) return `<div class="cur-ride"><div class="cur-row">${name}<span class="hint">keine Vorhersage</span></div></div>`;
     const a = r.a;
     const [wv, wl] = windCell(r);
@@ -330,7 +360,7 @@ function renderSummary(items, s) {
 
 // Ein Fahrt-Block in der Liste: nur ob es geht und welche Gefahren es gibt.
 function rideHtml(r, free = false) {
-  const name = `<span class="ride-name">${icon(r.name === 'Hinfahrt' ? (free ? 'bike' : 'work') : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
+  const name = `<span class="ride-name">${wxIcon(r.h, r.a) || icon(r.name === 'Hinfahrt' ? 'work' : 'home')}${r.name} ${hr(r.from)}–${hr(r.to)} Uhr</span>`;
   if (!r.a) return `<div class="ride none"><div class="ride-row">${name}<span class="hint">keine Vorhersage</span></div></div>`;
   const a = r.a;
   return `<div class="ride ${a.verdict}">
@@ -341,7 +371,7 @@ function rideHtml(r, free = false) {
 function ridesHtml(rides, free) {
   const [h, r] = rides;
   if (rides.length === 2 && h.a?.verdict === 'ok' && r.a?.verdict === 'ok') {
-    return `<div class="ride ok"><div class="ride-row"><span class="ride-name">${icon('bike')}Hin- und Rückfahrt</span>${pill('ok')}</div></div>`;
+    return `<div class="ride ok"><div class="ride-row"><span class="ride-name"><span class="wx2">${wxIcon(h.h, h.a)}${wxIcon(r.h, r.a)}</span>Hin- und Rückfahrt</span>${pill('ok')}</div></div>`;
   }
   return rides.map((x) => rideHtml(x, free)).join('');
 }

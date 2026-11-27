@@ -119,6 +119,16 @@ header { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
 .next .chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; }
 .next .overline { font-size: 10px; }
 
+/* Wettersymbole */
+svg.i.wx { width: 20px; height: 20px; stroke-width: 1.8; }
+.cur-name svg.i.wx, .ride-name svg.i.wx { width: 20px; height: 20px; color: inherit; }
+.wx-sun { color: #f5b301 !important; } .wx-sunCloud { color: #e0a400 !important; }
+.wx-moon, .wx-moonCloud { color: #a5b4fc !important; }
+.wx-cloud, .wx-fog { color: var(--muted) !important; }
+.wx-rain, .wx-showers { color: #3b9cff !important; }
+.wx-snow { color: #7dd3fc !important; }
+.wx2 { display: inline-flex; gap: 2px; }
+
 /* Zusammenfassung */
 .verdict-line { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
 .verdict-line svg.i { width: 20px; height: 20px; margin-top: 1px; }
@@ -336,7 +346,7 @@ input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent
   </form>
 </dialog>
 
-<script src="core.js?v=22"></script>
-<script src="app.js?v=22"></script>
+<script src="core.js?v=23"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>
