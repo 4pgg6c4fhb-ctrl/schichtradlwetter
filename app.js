@@ -6,7 +6,10 @@ const $ = (id) => document.getElementById(id);
 // ---------- Einstellungen ----------
 const SETTINGS_VERSION = 2;
 const DEFAULTS = {
-  fixLat: '47.4894', fixLon: '12.0620', placeName: 'Wörgl',
+  // Strecke: Start (= Wetterort) und Ziel; Rückfahrt ist der umgekehrte Weg
+  startName: 'Wörgl', startLat: '47.4894', startLon: '12.0620',
+  zielName: '', zielLat: '', zielLon: '',
+  rideMin: '',                // Fahrzeit in Minuten, leer = aus der Entfernung
   cycle: '1 1 2 2 3 3 f f f f', // Schichtsystem: Nummer = Schicht, f = frei
   t1: '6-14', t2: '14-22', t3: '22-6', t4: '',   // Zeiten der Schichten 1–4
   cycleStart: '2026-11-24',   // Tag 1 des Systems (erster Eintrag)
@@ -23,6 +26,10 @@ function settings() {
   const raw = load('settings', {});
   if ((raw.v || 1) < SETTINGS_VERSION) delete raw.heavyMm;   // alte Grenze (2 mm) durch neue ersetzen
   if (raw.l2t === 'Fleece, Windjacke, Radhose') raw.l2t = DEFAULTS.l2t;   // alter Standardtext
+  if ('fixLat' in raw && !('startLat' in raw)) {                              // alter fester Standort → Start
+    Object.assign(raw, { startLat: raw.fixLat, startLon: raw.fixLon, startName: raw.placeName || '' });
+  }
+  ['fixLat', 'fixLon', 'placeName'].forEach((k) => delete raw[k]);
   return Object.assign({}, DEFAULTS, raw);
 }
 const num = (x, fb) => { const v = parseFloat(String(x).replace(',', '.')); return isNum(v) ? v : fb; };
@@ -36,10 +43,27 @@ function prefs(s) {
   };
 }
 
+// ---------- Strecke ----------
+const ROAD_FACTOR = 1.3;   // Straße ist länger als die Luftlinie
+function route(s, p) {
+  const la1 = num(s.startLat, NaN), lo1 = num(s.startLon, NaN), la2 = num(s.zielLat, NaN), lo2 = num(s.zielLon, NaN);
+  const manual = num(s.rideMin, NaN);
+  if (![la1, lo1, la2, lo2].every(isNum)) return { km: null, bearing: null, min: isNum(manual) ? manual : 30 };
+  const r = Math.PI / 180;
+  const dLat = (la2 - la1) * r, dLon = (lo2 - lo1) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLon / 2) ** 2;
+  const km = 2 * 6371 * Math.asin(Math.sqrt(h)) * ROAD_FACTOR;
+  const y = Math.sin(dLon) * Math.cos(la2 * r);
+  const x = Math.cos(la1 * r) * Math.sin(la2 * r) - Math.sin(la1 * r) * Math.cos(la2 * r) * Math.cos(dLon);
+  const bearing = (Math.atan2(y, x) / r + 360) % 360;
+  const auto = Math.max(5, Math.round(km / p.rideKmh * 60 / 5) * 5);
+  return { km, bearing, auto, min: isNum(manual) ? manual : auto };
+}
+
 // ---------- Standort ----------
 function getPosition() {
   const s = settings();
-  const lat = num(s.fixLat, NaN), lon = num(s.fixLon, NaN);
+  const lat = num(s.startLat, NaN), lon = num(s.startLon, NaN);
   if (isNum(lat) && isNum(lon)) return Promise.resolve({ lat, lon, acc: 0, fixed: true });
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Kein GPS im Browser verfügbar'));
@@ -109,46 +133,47 @@ function shiftNumber(d, s) {
 }
 
 // Alle Schichten (gestern bis +10 Tage) mit bewerteten Fahrten.
-function planShifts(hours, data, s, p) {
+function planShifts(hours, data, s, p, rt) {
   const byT = new Map(hours.map((h) => [h.t, h]));
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = Date.now();
   const items = [];
-  const ride = (name, endT, snowFrom, snowTo) => {
-    if (endT <= now) return null;
-    // Wetterdaten sind stündlich: nächstliegende volle Stunde verwenden (z. B. 7:30 → Stunde bis 8:00)
-    const key = Math.round(endT / HOUR) * HOUR;
+  const dur = rt.min * 60e3;
+  const back = isNum(rt.bearing) ? (rt.bearing + 180) % 360 : null;
+  const floorH = (t) => Math.floor(t / HOUR) * HOUR, ceilH = (t) => Math.ceil(t / HOUR) * HOUR;
+  // Eine Fahrt von depart bis arrive. Wetter: Stunde, in der die Fahrtmitte liegt.
+  const ride = (name, depart, arrive, snowFrom, bearing) => {
+    if (arrive <= now) return null;
+    const key = floorH((depart + arrive) / 2) + HOUR;      // Stunden-Endzeitpunkt
     const h = byT.get(key) || byT.get(key + HOUR);
-    const snow = snowRisk(snowFrom, snowTo, data, p.snowCm);
+    const snow = snowRisk(floorH(snowFrom), ceilH(arrive), data, p.snowCm);
     const prev = [];
     for (let t = key - 6 * HOUR; t < key; t += HOUR) if (byT.has(t)) prev.push(byT.get(t));
-    return { name, from: endT - HOUR, to: endT, h, a: h ? assessRide([h], snow, p, prev) : null };
+    return { name, from: depart, to: arrive, h, a: h ? assessRide([h], snow, p, prev, bearing) : null };
   };
   const at = (d, hour) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(hour), Math.round((hour % 1) * 60)).getTime();
   for (let i = -1; i <= 10; i++) {
     const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
     let sh = shiftFor(d, s);
-    let start, end, out, back;
+    let outDep, outArr, backDep;
     if (sh) {
-      start = at(d, sh.s);
-      end = start + sh.len * HOUR;
-      out = start;                     // Hinfahrt: Stunde vor Schichtbeginn
-      back = end + HOUR;               // Rückfahrt: Stunde nach Schichtende
+      const start = at(d, sh.s);
+      outDep = start - dur; outArr = start;            // ankommen zu Schichtbeginn
+      backDep = start + sh.len * HOUR;                 // losfahren zu Schichtende
     } else {
       if (i < 0) continue;
-      // Freier Tag: Abfahrt um freeOut, Rückfahrt um freeBack (je 1 Stunde)
       const o = num(s.freeOut, 5), b = num(s.freeBack, 16);
       sh = { name: 'Frei', icon: 'calendar', cls: 'off', free: true, out: o, back: b };
-      start = at(d, o); end = at(d, b);
-      out = start + HOUR;
-      back = end + HOUR;
+      outDep = at(d, o); outArr = outDep + dur;
+      backDep = at(d, b);
     }
-    if (back <= now) continue;
+    const backArr = backDep + dur;
+    if (backArr <= now) continue;
     items.push({
-      d, sh, i, start, end,
+      d, sh, i,
       rides: [
-        ride('Hinfahrt', out, out - HOUR - SNOW_BEFORE_H * HOUR, out),   // Neuschnee der 6 h vor Abfahrt
-        ride('Rückfahrt', back, out - HOUR, back),   // Schnee seit der Hinfahrt zählt
+        ride('Hinfahrt', outDep, outArr, outDep - SNOW_BEFORE_H * HOUR, rt.bearing),   // Neuschnee der 6 h davor
+        ride('Rückfahrt', backDep, backArr, outDep, back),                            // Schnee seit der Hinfahrt
       ].filter(Boolean),
     });
   }
@@ -176,6 +201,9 @@ const ICONS = {
   humid: '<path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05Z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/>',
   shirt: '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23Z"/>',
   share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+  wind: '<path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>',
+  route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
 };
 const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -211,7 +239,24 @@ function shiftBadge(it) {
 }
 
 // Aktuelle Schicht: Hin- und Rückfahrt mit Status, Werten und Kleidung.
-function renderCurrent(items) {
+// "Wörgl Hauptbahnhof, Wörgl" → "Wörgl"; bei gleichem Ort für Start und Ziel der volle Name
+const placeOf = (n) => String(n || '').split(',').pop().replace(/\d+/g, '').trim();
+function routeNames(s) {
+  let a1 = placeOf(s.startName), a2 = placeOf(s.zielName);
+  if (a1 && a1 === a2) { a1 = s.startName.split(',')[0]; a2 = s.zielName.split(',')[0]; }
+  return [a1 || 'Start', a2];
+}
+
+// Wind auf der Strecke als Kachel-Text
+function windCell(r) {
+  const head = r.a?.head;
+  if (!isNum(head)) return [isNum(r.h.wind) ? `${fmt0(r.h.wind * 3.6)}` : '–', 'Wind km/h'];
+  if (head >= 3) return [fmt0(head), 'Gegenwind'];
+  if (head <= -3) return [fmt0(-head), 'Rückenwind'];
+  return [fmt0(r.h.wind * 3.6), 'Seitenwind'];
+}
+
+function renderCurrent(items, rt, s) {
   const el = $('next');
   const it = items.find((x) => x.rides.length);
   if (!it) { el.hidden = true; return null; }
@@ -230,11 +275,13 @@ function renderCurrent(items) {
         <div class="status-icon ${a.verdict}">${icon(a.verdict)}</div>
         <div class="status-text">${head}<b>${VERDICT[a.verdict]}</b>${a.reasons.length ? `<span>${esc(a.reasons.join(' · '))}</span>` : ''}</div>
       </div>
-      <div class="metrics four num">
-        <div class="metric"><div class="v">${deg(r.h.feel)}</div><div class="l">${icon('bike')}Gefühlt</div></div>
+      <div class="metrics num">
+        <div class="metric"><div class="v">${deg(a.fMin)}</div><div class="l">${icon('bike')}Gefühlt</div></div>
         <div class="metric"><div class="v">${pct(r.h.prob)}</div><div class="l">${icon('drop')}Regen</div></div>
         <div class="metric"><div class="v">${pct(a.pSnow)}</div><div class="l">${icon('snow')}Schnee</div></div>
+        <div class="metric"><div class="v">${deg(r.h.temp)}</div><div class="l">${icon('thermo')}Luft</div></div>
         <div class="metric"><div class="v">${pct(r.h.rh)}</div><div class="l">${icon('humid')}Feuchte</div></div>
+        <div class="metric"><div class="v">${windCell(r)[0]}</div><div class="l">${icon('wind')}${windCell(r)[1]}</div></div>
       </div>
       ${sameClothes ? '' : `<div class="overline">Kleidung</div>${chips(a.clothes)}`}</div>`;
   };
@@ -242,6 +289,7 @@ function renderCurrent(items) {
   el.innerHTML = `
     <div class="head"><span class="overline">Aktuelle Schicht · ${dayLabel(it.i, it.d)}</span>${trend ? '<span class="tag">Trend</span>' : ''}</div>
     <div class="cur-badge">${shiftBadge(it)}</div>
+    <div class="route">${icon('route')}${esc(routeNames(s)[0])}${s.zielName ? ` → ${esc(routeNames(s)[1])}` : ''}${isNum(rt.km) ? ` · ca. ${fmt0(rt.km)} km` : ''} · ${fmt0(rt.min)} min</div>
     ${past}${it.rides.map(rideBlock).join('')}
     ${sameClothes ? `<div class="cur-ride"><div class="overline">Kleidung · Hin- und Rückfahrt</div>${chips(withA[0].a.clothes)}</div>` : ''}`;
   return it;
@@ -358,11 +406,12 @@ async function run() {
     if (!hours.length) throw new Error('Keine Vorhersagedaten für diesen Ort.');
 
     const h0 = hours[0];
-    $('place').innerHTML = `${icon('pin')}${esc(s.placeName || (pos.fixed ? 'Fester Standort' : 'GPS-Standort'))}` +
+    $('place').innerHTML = `${icon('pin')}${esc(placeOf(s.startName) || (pos.fixed ? 'Start' : 'GPS-Standort'))}` +
       (isNum(h0?.temp) ? ` · jetzt ${deg(h0.temp)}, gefühlt ${deg(h0.feel)}` : '') + (pos.stale ? ' · letzter Standort' : '');
 
-    const items = planShifts(hours, { gs, om, ecm }, s, p);
-    const current = renderCurrent(items);
+    const rt = route(s, p);
+    const items = planShifts(hours, { gs, om, ecm }, s, p, rt);
+    const current = renderCurrent(items, rt, s);
     renderSummary(items, s);
     renderShifts(items, current);
 
@@ -385,14 +434,75 @@ async function run() {
 
 // ---------- Einstellungs-Dialog ----------
 const FIELDS = Object.keys(DEFAULTS);
-function fillForm(s) { FIELDS.forEach((f) => { $(f).value = s[f]; }); }
+function formValues() { const o = {}; FIELDS.forEach((f) => { o[f] = $(f).value.trim(); }); return o; }
+function showPlace(which) {
+  const name = $(which + 'Name').value, lat = $(which + 'Lat').value;
+  $(which + 'Found').innerHTML = name && lat ? `<span class="ok">✓</span> ${esc(name)}` : (which === 'ziel' ? 'Noch kein Ziel – ohne Ziel kein Gegenwind, Fahrzeit 30 min.' : '');
+}
+function updateRideHint() {
+  const v = formValues();
+  const rt = route(v, prefs(v));
+  $('rideHint').textContent = isNum(rt.km)
+    ? `Strecke ca. ${fmt0(rt.km)} km → automatisch ${rt.auto} min bei ${fmt0(num(v.rideKmh, 20))} km/h. Leer lassen = automatisch.`
+    : 'Leer = 30 min (ohne Ziel). Mit Ziel wird die Zeit aus der Entfernung berechnet.';
+}
+function fillForm(s) {
+  FIELDS.forEach((f) => { $(f).value = s[f]; });
+  $('startQ').value = s.startName; $('zielQ').value = s.zielName;
+  showPlace('start'); showPlace('ziel'); updateRideHint();
+}
+// Adresssuche über Photon (OpenStreetMap-Daten), bevorzugt Treffer in der Nähe des Starts
+async function findPlace(which) {
+  const q = $(which + 'Q').value.trim();
+  const box = $(which + 'Found');
+  if (!q) { box.textContent = 'Bitte Adresse oder Ort eingeben.'; return; }
+  box.textContent = 'Suche …';
+  try {
+    const bias = `&lat=${num($('startLat').value, 47.49)}&lon=${num($('startLon').value, 12.06)}`;
+    const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lang=de${bias}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const seen = new Set();
+    const hits = ((await r.json()).features || []).filter((f) => {      // doppelte Treffer weglassen
+      const p = f.properties, k = [p.name, p.street, p.housenumber, p.city].join('|');
+      if (seen.has(k)) return false; seen.add(k); return true;
+    });
+    if (!hits.length) { box.textContent = 'Nichts gefunden – anders schreiben (z. B. mit Ort).'; return; }
+    box.innerHTML = hits.map((f, k) => {
+      const p = f.properties;
+      const label = [p.name, [p.street, p.housenumber].filter(Boolean).join(' '), [p.postcode, p.city || p.town || p.village].filter(Boolean).join(' ')]
+        .filter((x, i, arr) => x && arr.indexOf(x) === i).join(', ');
+      const short = [p.name || [p.street, p.housenumber].filter(Boolean).join(' '), p.city || p.town || p.village].filter(Boolean)
+        .filter((x, i, arr) => arr.indexOf(x) === i).join(', ');
+      return `<button type="button" class="pick" data-k="${k}" data-short="${esc(short)}">${esc(label)}</button>`;
+    }).join('');
+    box.querySelectorAll('.pick').forEach((b) => b.addEventListener('click', () => {
+      const f = hits[+b.dataset.k];
+      $(which + 'Name').value = b.dataset.short;
+      $(which + 'Lat').value = f.geometry.coordinates[1].toFixed(5);
+      $(which + 'Lon').value = f.geometry.coordinates[0].toFixed(5);
+      $(which + 'Q').value = $(which + 'Name').value;
+      showPlace(which); updateRideHint();
+    }));
+  } catch (e) {
+    box.textContent = 'Suche nicht erreichbar: ' + e.message;
+  }
+}
+document.querySelectorAll('[data-find]').forEach((b) => {
+  b.innerHTML = icon('search');
+  b.addEventListener('click', () => findPlace(b.dataset.find));
+});
+['startQ', 'zielQ'].forEach((id) => $(id).addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); findPlace(id.slice(0, -1)); }
+}));
+$('zielQ').addEventListener('input', () => {   // Ziel geleert → Ziel entfernen
+  if (!$('zielQ').value.trim()) { ['zielName', 'zielLat', 'zielLon'].forEach((f) => { $(f).value = ''; }); showPlace('ziel'); updateRideHint(); }
+});
+['rideMin', 'rideKmh'].forEach((id) => $(id).addEventListener('input', updateRideHint));
 $('btnSettings').addEventListener('click', () => { fillForm(settings()); $('settings').showModal(); });
 $('btnDefaults').addEventListener('click', () => fillForm(DEFAULTS));
 $('settings').addEventListener('close', () => {
   if ($('settings').returnValue !== 'save') return;
-  const next = { v: SETTINGS_VERSION };
-  FIELDS.forEach((f) => { next[f] = $(f).value.trim(); });
-  store('settings', next);
+  store('settings', Object.assign({ v: SETTINGS_VERSION }, formValues()));
   run();
 });
 $('btnReload').addEventListener('click', () => {

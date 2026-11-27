@@ -74,16 +74,24 @@ async function fetchGeoSphere(lat, lon) {
   return { res, errors };
 }
 
+// Mittlere Windrichtung (Grad, woher der Wind kommt) über mehrere Werte
+function dirMean(list) {
+  const v = list.filter(isNum);
+  if (!v.length) return null;
+  const s = v.reduce((a, d) => a + Math.sin(d * Math.PI / 180), 0), c = v.reduce((a, d) => a + Math.cos(d * Math.PI / 180), 0);
+  return (Math.atan2(s, c) * 180 / Math.PI + 360) % 360;
+}
+
 // Open-Meteo Ensemble-API: kostenlos, ohne Key. Pro Stunde werden die Mengen aller Läufe gespeichert,
 // damit sich beliebige Schwellen (0,1 mm „nass“, x mm „zu stark zum Radeln“) auszählen lassen.
 //  - icon_d2_eps: DWD ICON-D2, 20 Läufe, 2 km, ~2 Tage
 //  - ecmwf_ifs025: ECMWF, 51 Läufe, 25 km, 12 Tage (für die Schichten weiter voraus)
 async function fetchEnsemble(model, days, ttlMs, lat, lon) {
-  const vars = ['precipitation', 'snowfall', 'temperature_2m', 'relative_humidity_2m', 'cloud_cover', 'wind_speed_10m', 'wind_gusts_10m'];
+  const vars = ['precipitation', 'snowfall', 'temperature_2m', 'relative_humidity_2m', 'cloud_cover', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
   const url = `${OM}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=${vars.join(',')}` +
     `&models=${model}&forecast_days=${days}&timezone=GMT&wind_speed_unit=ms`;
   try {
-    const json = await cachedJson(`om3-${model}-${lat.toFixed(3)},${lon.toFixed(3)}`, ttlMs, url);
+    const json = await cachedJson(`om4-${model}-${lat.toFixed(3)},${lon.toFixed(3)}`, ttlMs, url);
     if (json.error) throw new Error(json.reason || 'Fehler');
     const h = json.hourly || {};
     const members = (name) => Object.keys(h).filter((k) => k === name || k.startsWith(name + '_member'));
@@ -100,7 +108,8 @@ async function fetchEnsemble(model, days, ttlMs, lat, lon) {
       rows.set(Date.parse(t + 'Z'), {
         prec, prec3, n: prec.length, mm: prec[Math.floor(prec.length / 2)],
         snowM: sk.map((k) => h[k][i]),        // Neuschnee in cm je Lauf (Reihenfolge = Lauf)
-        temp: at('temperature_2m'), rh: at('relative_humidity_2m'), cloud: at('cloud_cover'), wind: at('wind_speed_10m'), gust: at('wind_gusts_10m'),
+        temp: at('temperature_2m'), rh: at('relative_humidity_2m'), cloud: at('cloud_cover'),
+        windDir: dirMean(members('wind_direction_10m').map((k) => h[k][i])), wind: at('wind_speed_10m'), gust: at('wind_gusts_10m'),
       });
     });
     if (!rows.size) throw new Error('keine Daten für diesen Ort');
@@ -225,6 +234,8 @@ function buildHours(pos, gs, om, ecm, opts = {}) {
       h = {
         t, prob, pHeavy, mm, temp, wind, day, range: 'kurz',
         rh: avg([n['2r'], o.rh]),
+        // Richtung, aus der der Wind kommt: GeoSphere (u/v) bevorzugt, sonst ICON-D2
+        windDir: isNum(n['10u']) && isNum(n['10v']) ? (Math.atan2(-n['10u'], -n['10v']) * 180 / Math.PI + 360) % 360 : o.windDir,
         gust: avg([n['10fg'], o.gust]),
         cloud: avg([n.tcc, o.cloud]),
         snow: isNum(n.sf) && isNum(n.rain) ? n.sf > n.rain : (isNum(temp) && temp < 0.5),
@@ -235,7 +246,7 @@ function buildHours(pos, gs, om, ecm, opts = {}) {
       // Langfrist: ECMWF-Ensemble (grob, Trend)
       h = {
         t, prob: fracAbove(x.prec, THRESHOLD_MM), pHeavy: fracAbove(x.prec3, heavy * 1.5),
-        mm: x.mm, temp: x.temp, rh: x.rh, wind: x.wind, gust: x.gust, cloud: x.cloud, day, range: 'lang',
+        mm: x.mm, temp: x.temp, rh: x.rh, windDir: x.windDir, wind: x.wind, gust: x.gust, cloud: x.cloud, day, range: 'lang',
         snow: isNum(x.temp) && x.temp < 0.5,
         src: { pEcm: fracAbove(x.prec, THRESHOLD_MM), ecmN: x.n, ecmMm: x.mm },
       };
@@ -252,9 +263,17 @@ function buildHours(pos, gs, om, ecm, opts = {}) {
 const RIDE_KMH = 20;   // Fahrtwind: Eigengeschwindigkeit, die zum Wind dazukommt
 
 // Gefühlte Temperatur auf dem Rad (Windchill-Formel mit Wind + Fahrtwind; über 10 °C gilt die Lufttemperatur).
-function rideFeel(temp, windMs, rideKmh = RIDE_KMH) {
+// Mit Fahrtrichtung (bearing) und Windrichtung (woher) zählt der echte Fahrtwind:
+// Gegenwind kommt dazu, Rückenwind wird abgezogen, Seitenwind zählt quer.
+function windOnRoute(windMs, windDir, bearing) {
+  if (!isNum(windMs) || !isNum(windDir) || !isNum(bearing)) return null;
+  const a = (windDir - bearing) * Math.PI / 180;
+  return { head: windMs * 3.6 * Math.cos(a), cross: Math.abs(windMs * 3.6 * Math.sin(a)) };
+}
+function rideFeel(temp, windMs, rideKmh = RIDE_KMH, windDir = null, bearing = null) {
   if (!isNum(temp)) return null;
-  const v = (isNum(windMs) ? windMs * 3.6 : 0) + rideKmh;
+  const w = windOnRoute(windMs, windDir, bearing);
+  const v = w ? Math.max(5, Math.hypot(rideKmh + w.head, w.cross)) : (isNum(windMs) ? windMs * 3.6 : 0) + rideKmh;
   if (temp > 10) return temp - Math.min(3, v / 15);
   const p = Math.pow(v, 0.16);
   return 13.12 + 0.6215 * temp - 11.37 * p + 0.3965 * temp * p;
@@ -315,11 +334,17 @@ function iceRisk(hs, prev) {
 }
 
 // Bewertung einer Fahrt: Stunden der Fahrt (+ 6 h davor für nasse Fahrbahn) + Schnee-Risiko → Ampel, Gründe, Kleidung.
-function assessRide(hs, snow, prefs, prev = []) {
+// bearing: Fahrtrichtung in Grad (0 = Nord), null = unbekannt.
+function assessRide(hs, snow, prefs, prev = [], bearing = null) {
   hs = hs.filter((h) => isNum(h.temp));
   if (!hs.length) return null;
   const max = (k) => { const v = hs.map((h) => h[k]).filter(isNum); return v.length ? Math.max(...v) : null; };
-  const fMin = Math.min(...hs.map((h) => h.feel).filter(isNum));
+  const feels = hs.map((h) => rideFeel(h.temp, h.wind, prefs.rideKmh, h.windDir, bearing)).filter(isNum);
+  const fMin = Math.min(...feels);
+  const winds = hs.map((h) => windOnRoute(h.wind, h.windDir, bearing)).filter(Boolean);
+  const head = winds.length ? avg(winds.map((w) => w.head)) : null;      // km/h, + = Gegenwind, − = Rückenwind
+  const headGust = hs.map((h) => windOnRoute(h.gust, h.windDir, bearing)).filter(Boolean).map((w) => w.head);
+  const headGustMax = headGust.length ? Math.max(...headGust) : null;
   const tMin = Math.min(...hs.map((h) => h.temp));
   const pMax = max('prob') ?? 0;
   const pHeavy = max('pHeavy') ?? 0;
@@ -335,6 +360,8 @@ function assessRide(hs, snow, prefs, prev = []) {
   if (pHeavy >= 25) reasons.push(pHeavy >= 50 ? `viel Regen (${fmt0(pHeavy)} %)` : `evtl. viel Regen (${fmt0(pHeavy)} %)`);
   if (ice) reasons.push(iceText);
   if (storm) reasons.push(`Sturmböen ${fmt0(gustKmh)} km/h`);
+  const strongHead = isNum(head) && (head >= 25 || (isNum(headGustMax) && headGustMax >= 45));
+  if (strongHead && !storm) reasons.push(`starker Gegenwind (${fmt0(head)} km/h${isNum(headGustMax) ? `, Böen ${fmt0(headGustMax)}` : ''})`);
 
   let verdict = 'ok';
   if (reasons.length) verdict = 'warn';
@@ -342,6 +369,6 @@ function assessRide(hs, snow, prefs, prev = []) {
 
   let clothes = outfit(fMin, prefs);
   if (pMax >= 30 && verdict !== 'stop') clothes += ' + Regenjacke';
-  return { verdict, reasons, clothes, fMin, tMin, pMax, pHeavy, pSnow, ice, iceText, rh, storm,
+  return { verdict, reasons, clothes, fMin, tMin, pMax, pHeavy, pSnow, ice, iceText, rh, storm, head, strongHead,
     trend: hs.some((h) => h.range === 'lang') || !!snow?.trend };
 }

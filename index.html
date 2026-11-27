@@ -182,6 +182,15 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
 .btn { font: inherit; font-weight: 600; border: 1px solid var(--border); border-radius: 10px; padding: 9px 16px; background: var(--surface2); color: var(--text); cursor: pointer; }
 .btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
 .btn.left { margin-right: auto; }
+.row.search { align-items: center; }
+.row.search input { flex: 1; }
+.row.search .btn { flex: none; padding: 9px 12px; display: grid; place-items: center; }
+.found { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.found .pick { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; margin-top: 4px; cursor: pointer; }
+.found .ok { color: var(--ok); }
+.route { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.route svg.i { width: 14px; height: 14px; }
 </style>
 </head>
 <body>
@@ -213,7 +222,8 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
   <section class="card">
     <details>
       <summary id="howSummary">Wie wird gerechnet?</summary>
-      <p><b>Gefühlt</b> = Temperatur am Rad mit Wind + Fahrtwind.</p>
+      <p><b>Gefühlt</b> = Temperatur am Rad mit dem echten Fahrtwind: Fahrtgeschwindigkeit plus Gegenwind bzw. minus Rückenwind auf deiner Strecke (Start → Ziel, zurück umgekehrt). Ab 25 km/h Gegenwind (oder Böen ab 45 km/h) gibt es eine Warnung.</p>
+      <p><b>Fahrzeit</b> = Entfernung (Luftlinie × 1,3) ÷ Fahrtgeschwindigkeit, oder selbst eingetragen. Hinfahrt endet zu Schichtbeginn, Rückfahrt beginnt zu Schichtende.</p>
       <p><b>Nicht fahren</b>, wenn mindestens die Hälfte der Wetterläufe mehr Regen als deine Grenze bringt (Standard 0,5 mm/h = mehr als Tröpfeln) oder Schneefahrbahn droht. <b>Aufpassen</b> ab 25 %, bei Glätte oder Sturmböen.</p>
       <p><b>Glätte</b> nur bei Feuchtigkeit: nasse Fahrbahn bei Frost (Niederschlag jetzt oder in den 6 Stunden davor) oder Reif (Frost + Luftfeuchte ab 92 % bei klarem Himmel, Nebelreif ab 97 %).</p>
       <p><b>Schnee:</b> Hinfahrt = Neuschnee der 6 Stunden davor, Rückfahrt = Neuschnee seit der Hinfahrt (ganze Schicht).</p>
@@ -229,6 +239,7 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
     <div><b>© 2026 SchichtRADWETTER</b> · Idee: Tom Mo · Alle Rechte vorbehalten</div>
     <div>Wetterdaten: <a href="https://data.hub.geosphere.at" target="_blank" rel="noopener">GeoSphere Austria</a> (CC BY 4.0) ·
       <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) mit Modelldaten von DWD und ECMWF</div>
+    <div>Adresssuche: <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a> · Kartendaten © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende</div>
     <div>Angaben ohne Gewähr. Vor der Fahrt selbst auf Straße und Wetter achten.</div>
   </footer>
 </main>
@@ -262,6 +273,21 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
     </fieldset>
 
     <fieldset>
+      <legend>Strecke</legend>
+      <label for="startQ">Start (Adresse oder Ort)</label>
+      <div class="row search"><input id="startQ" placeholder="z. B. Wörgl, Bahnhofstraße 1" autocomplete="off"><button class="btn" type="button" data-find="start" aria-label="Start suchen"></button></div>
+      <div class="found" id="startFound"></div>
+      <label for="zielQ">Ziel (Arbeitsplatz)</label>
+      <div class="row search"><input id="zielQ" placeholder="z. B. Kufstein, Arbeitsstraße 5" autocomplete="off"><button class="btn" type="button" data-find="ziel" aria-label="Ziel suchen"></button></div>
+      <div class="found" id="zielFound"></div>
+      <label for="rideMin">Fahrzeit in Minuten</label>
+      <input id="rideMin" inputmode="numeric" placeholder="automatisch">
+      <div class="hint" id="rideHint">Leer = aus Entfernung und Fahrtgeschwindigkeit.</div>
+      <input type="hidden" id="startName"><input type="hidden" id="startLat"><input type="hidden" id="startLon">
+      <input type="hidden" id="zielName"><input type="hidden" id="zielLat"><input type="hidden" id="zielLon">
+    </fieldset>
+
+    <fieldset>
       <legend>Schichtsystem</legend>
       <label for="cycle">System (Zahl = Schicht, f = frei)</label>
       <input id="cycle" placeholder="1 1 2 2 3 3 f f f f" autocapitalize="off" autocorrect="off">
@@ -275,19 +301,12 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
     </fieldset>
 
     <fieldset>
-      <legend>Freie Tage &amp; Ort</legend>
-      <label>Freie Tage: Hinfahrt und Rückfahrt (Uhr)</label>
+      <legend>Freie Tage</legend>
+      <label>Hinfahrt und Rückfahrt (Uhr)</label>
       <div class="row">
         <input id="freeOut" inputmode="decimal" placeholder="5">
         <input id="freeBack" inputmode="decimal" placeholder="16">
       </div>
-      <label>Standort (beide leer = GPS)</label>
-      <div class="row">
-        <input id="fixLat" inputmode="decimal" placeholder="Breite 47.489">
-        <input id="fixLon" inputmode="decimal" placeholder="Länge 12.062">
-      </div>
-      <label for="placeName">Name des Orts</label>
-      <input id="placeName" placeholder="Wörgl">
     </fieldset>
 
     <div class="actions">
@@ -298,7 +317,7 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transpare
   </form>
 </dialog>
 
-<script src="core.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="core.js?v=19"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

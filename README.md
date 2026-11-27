@@ -21,7 +21,10 @@ Eine Seite:
 | darüber | Alles kurz |
 | Zu viel Regen | ab 0,5 mm/h (mehr als Tröpfeln) |
 | Schneefahrbahn | ab 1 cm Neuschnee – Hinfahrt: 6 h davor, Rückfahrt: während der Schicht |
-| Gefühlt am Rad | Windchill mit Wind + 20 km/h Fahrtwind |
+| Strecke | Start und Ziel per Adresssuche (Photon / OpenStreetMap); Rückfahrt = umgekehrt |
+| Fahrzeit | Luftlinie × 1,3 ÷ Fahrtgeschwindigkeit (20 km/h) oder selbst eingetragen; ohne Ziel 30 min |
+| Gefühlt am Rad | Windchill mit echtem Fahrtwind: Fahrtgeschwindigkeit ± Gegen-/Rückenwind auf der Strecke |
+| Gegenwind-Warnung | ab 25 km/h Gegenwind oder Böen ab 45 km/h |
 
 🚫 *Nicht fahren*, wenn mindestens die Hälfte der Wetterläufe zu viel Regen oder
 Schneefahrbahn bringt; ⚠️ *aufpassen* ab 25 %, bei Glätte oder Sturmböen.
@@ -42,4 +45,5 @@ Lokal: `python3 -m http.server` und `http://localhost:8000` öffnen.
 © 2026 SchichtRADWETTER · Idee: Tom Mo · Alle Rechte vorbehalten.
 
 Wetterdaten: GeoSphere Austria (CC BY 4.0), Open-Meteo.com (CC BY 4.0) mit Modelldaten
-von DWD und ECMWF. Angaben ohne Gewähr.
+von DWD und ECMWF. Adresssuche: Photon, Kartendaten © OpenStreetMap-Mitwirkende.
+Angaben ohne Gewähr.
